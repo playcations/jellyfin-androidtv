@@ -3,12 +3,14 @@ package org.jellyfin.androidtv.ui.settings.screen.home
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.preference.UserSettingPreferences
 import org.jellyfin.androidtv.ui.base.Text
+import org.jellyfin.androidtv.ui.base.form.Checkbox
 import org.jellyfin.androidtv.ui.base.list.ListButton
 import org.jellyfin.androidtv.ui.base.list.ListSection
 import org.jellyfin.androidtv.ui.navigation.LocalRouter
@@ -38,6 +40,17 @@ fun SettingsHomeScreen() {
 				captionContent = { Text(stringResource(userSettingPreferences[section].nameRes)) },
 				onClick = { router.push(Routes.HOME_SECTION, mapOf("index" to index.toString())) },
 				modifier = Modifier.focusKey("home_section_$index")
+			)
+		}
+
+		item {
+			var forYouRows by rememberPreference(userSettingPreferences, UserSettingPreferences.forYouRows)
+			ListButton(
+				headingContent = { Text(stringResource(R.string.home_section_for_you)) },
+				captionContent = { Text(stringResource(R.string.home_for_you_description)) },
+				trailingContent = { Checkbox(checked = forYouRows) },
+				onClick = { forYouRows = !forYouRows },
+				modifier = Modifier.focusKey("home_for_you_rows")
 			)
 		}
 

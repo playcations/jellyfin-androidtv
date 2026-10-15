@@ -57,6 +57,7 @@ import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.sockets.subscribe
 import org.jellyfin.sdk.model.api.LibraryChangedMessage
 import org.jellyfin.sdk.model.api.UserDataChangedMessage
+import org.jellyfin.sdk.model.api.UserDto
 import org.koin.android.ext.android.inject
 import timber.log.Timber
 import kotlin.time.Duration.Companion.seconds
@@ -89,6 +90,57 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private val notificationsRow by lazy { NotificationsHomeFragmentRow(lifecycleScope, notificationsRepository) }
 	private val nowPlaying by lazy { HomeFragmentNowPlayingRow(lifecycleScope, playbackManager, mediaManager) }
 
+	// The For You rows already show the plugin's picks, so skip its "Recently added" duplicate when they are shown
+	private suspend fun latestMediaViews(forYouRows: Boolean) = userViewsRepository.views.first().let { views ->
+		if (forYouRows) views.filterNot(HomeFragmentForYouRow::isForYouView) else views
+	}
+
+	// For You rows go right after Next up, else after Continue watching, else first
+	private fun forYouAfter(homesections: List<HomeSectionType>) = when {
+		HomeSectionType.NEXT_UP in homesections -> HomeSectionType.NEXT_UP
+		HomeSectionType.RESUME in homesections -> HomeSectionType.RESUME
+		else -> null
+	}
+
+	private suspend fun buildRows(currentUser: UserDto): List<HomeFragmentRow> {
+		// Start out with default sections
+		val homesections = userSettingPreferences.activeHomesections
+		val forYouRows = userSettingPreferences[UserSettingPreferences.forYouRows]
+		val forYouAfter = if (forYouRows) forYouAfter(homesections) else null
+
+		// Make sure the rows are empty
+		val rows = mutableListOf<HomeFragmentRow>()
+
+		// Loads in the background and inserts its rows when ready, so the other rows don't wait for it
+		if (forYouRows && forYouAfter == null) rows.add(helper.loadForYou(lifecycleScope))
+
+		// Actually add the sections
+		for (section in homesections) when (section) {
+			HomeSectionType.LATEST_MEDIA -> rows.add(helper.loadRecentlyAdded(latestMediaViews(forYouRows)))
+			HomeSectionType.LIBRARY_TILES_SMALL -> rows.add(HomeFragmentViewsRow(small = false))
+			HomeSectionType.LIBRARY_BUTTONS -> rows.add(HomeFragmentViewsRow(small = true))
+			HomeSectionType.RESUME -> {
+				rows.add(helper.loadResumeVideo())
+				if (forYouAfter == HomeSectionType.RESUME) rows.add(helper.loadForYou(lifecycleScope))
+			}
+			HomeSectionType.RESUME_AUDIO -> rows.add(helper.loadResumeAudio())
+			HomeSectionType.RESUME_BOOK -> Unit // Books are not (yet) supported
+			HomeSectionType.ACTIVE_RECORDINGS -> rows.add(helper.loadLatestLiveTvRecordings())
+			HomeSectionType.NEXT_UP -> {
+				rows.add(helper.loadNextUp())
+				if (forYouAfter == HomeSectionType.NEXT_UP) rows.add(helper.loadForYou(lifecycleScope))
+			}
+			HomeSectionType.LIVE_TV -> if (currentUser.policy?.enableLiveTvAccess == true) {
+				rows.add(HomeFragmentLiveTVRow(requireActivity(), userRepository))
+				rows.add(helper.loadOnNow())
+			}
+
+			HomeSectionType.NONE -> Unit
+		}
+
+		return rows
+	}
+
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 
@@ -99,37 +151,10 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				userRepository.currentUser.filterNotNull().first()
 			}
 
-			// Start out with default sections
-			val homesections = userSettingPreferences.activeHomesections
-
-			// Make sure the rows are empty
-			val rows = mutableListOf<HomeFragmentRow>()
+			val rows = buildRows(currentUser)
 
 			// Check for coroutine cancellation
 			if (!isActive) return@launch
-
-			// Actually add the sections
-			for (section in homesections) when (section) {
-				HomeSectionType.LATEST_MEDIA -> {
-					// The For You rows already show the plugin's picks, skip its "Recently added" duplicate
-					val views = userViewsRepository.views.first()
-					rows.add(helper.loadRecentlyAdded(if (HomeSectionType.FOR_YOU in homesections) views.filterNot(HomeFragmentForYouRow::isForYouView) else views))
-				}
-				HomeSectionType.LIBRARY_TILES_SMALL -> rows.add(HomeFragmentViewsRow(small = false))
-				HomeSectionType.LIBRARY_BUTTONS -> rows.add(HomeFragmentViewsRow(small = true))
-				HomeSectionType.RESUME -> rows.add(helper.loadResumeVideo())
-				HomeSectionType.RESUME_AUDIO -> rows.add(helper.loadResumeAudio())
-				HomeSectionType.RESUME_BOOK -> Unit // Books are not (yet) supported
-				HomeSectionType.ACTIVE_RECORDINGS -> rows.add(helper.loadLatestLiveTvRecordings())
-				HomeSectionType.NEXT_UP -> rows.add(helper.loadNextUp())
-				HomeSectionType.LIVE_TV -> if (currentUser.policy?.enableLiveTvAccess == true) {
-					rows.add(HomeFragmentLiveTVRow(requireActivity(), userRepository))
-					rows.add(helper.loadOnNow())
-				}
-
-				HomeSectionType.FOR_YOU -> helper.loadForYou()?.let(rows::add)
-				HomeSectionType.NONE -> Unit
-			}
 
 			// Add sections to layout
 			withContext(Dispatchers.Main) {
