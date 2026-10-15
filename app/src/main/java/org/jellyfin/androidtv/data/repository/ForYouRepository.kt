@@ -9,8 +9,11 @@ import org.jellyfin.sdk.api.client.exception.ApiClientException
 import org.jellyfin.sdk.api.client.exception.InvalidStatusException
 import org.jellyfin.sdk.api.client.extensions.get
 import org.jellyfin.sdk.model.api.BaseItemDtoQueryResult
+import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.ItemFields
 import timber.log.Timber
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Client for the "For You" server plugin that provides personalized recommendation sections.
@@ -34,6 +37,25 @@ interface ForYouRepository {
 		startIndex: Int,
 		limit: Int,
 		fields: Collection<ItemFields>? = null,
+	): BaseItemDtoQueryResult
+
+	/**
+	 * Check if the server supports the "Recommended" library sort. The result is cached per server.
+	 */
+	suspend fun isRecommendedSortAvailable(): Boolean
+
+	/**
+	 * Get a page of library items in recommended order (unwatched recommendations first, watched items last).
+	 */
+	@Suppress("LongParameterList")
+	suspend fun getRecommendedItems(
+		parentId: UUID?,
+		includeItemTypes: Collection<BaseItemKind>?,
+		startIndex: Int,
+		limit: Int,
+		fields: Collection<ItemFields>? = null,
+		isPlayed: Boolean? = null,
+		isFavorite: Boolean? = null,
 	): BaseItemDtoQueryResult
 }
 
@@ -78,6 +100,57 @@ class ForYouRepositoryImpl(
 				put("startIndex", startIndex)
 				put("limit", limit)
 				put("fields", fields)
+			},
+		).content
+	}
+
+	private val recommendedSortAvailability = ConcurrentHashMap<String, Boolean>()
+
+	override suspend fun isRecommendedSortAvailable(): Boolean {
+		val baseUrl = api.baseUrl ?: return false
+		recommendedSortAvailability[baseUrl]?.let { return it }
+
+		return withContext(Dispatchers.IO) {
+			try {
+				api.get<BaseItemDtoQueryResult>(
+					pathTemplate = "/ForYou/Recommended",
+					queryParameters = mapOf("limit" to 0),
+				)
+				recommendedSortAvailability[baseUrl] = true
+				true
+			} catch (err: InvalidStatusException) {
+				if (err.status == HTTP_NOT_FOUND) Timber.d("For You recommended sort not available on server")
+				else Timber.w(err, "Failed to check For You recommended sort availability")
+				recommendedSortAvailability[baseUrl] = false
+				false
+			} catch (err: ApiClientException) {
+				// Network errors are not cached so the check is retried later
+				Timber.w(err, "Failed to check For You recommended sort availability")
+				false
+			}
+		}
+	}
+
+	override suspend fun getRecommendedItems(
+		parentId: UUID?,
+		includeItemTypes: Collection<BaseItemKind>?,
+		startIndex: Int,
+		limit: Int,
+		fields: Collection<ItemFields>?,
+		isPlayed: Boolean?,
+		isFavorite: Boolean?,
+	): BaseItemDtoQueryResult = withContext(Dispatchers.IO) {
+		api.get<BaseItemDtoQueryResult>(
+			pathTemplate = "/ForYou/Recommended",
+			queryParameters = buildMap {
+				put("parentId", parentId)
+				put("includeItemTypes", includeItemTypes)
+				put("startIndex", startIndex)
+				put("limit", limit)
+				put("fields", fields)
+				put("isPlayed", isPlayed)
+				put("isFavorite", isFavorite)
+				put("enableImages", true)
 			},
 		).content
 	}

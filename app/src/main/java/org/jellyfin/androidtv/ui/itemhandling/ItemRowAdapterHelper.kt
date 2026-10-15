@@ -9,6 +9,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.constant.LiveTvOption
+import org.jellyfin.androidtv.data.model.FilterOptions
 import org.jellyfin.androidtv.data.querying.GetAdditionalPartsRequest
 import org.jellyfin.androidtv.data.querying.GetForYouSectionItemsRequest
 import org.jellyfin.androidtv.data.querying.GetSpecialsRequest
@@ -631,6 +632,45 @@ fun ItemRowAdapter.retrieveForYouSectionItems(
 
 			totalItems = response.totalRecordCount
 			setForYouSectionItems(response.items)
+		}.fold(
+			onSuccess = { notifyRetrieveFinished() },
+			onFailure = { error -> notifyRetrieveFinished(error as? Exception) }
+		)
+	}
+}
+
+fun ItemRowAdapter.retrieveRecommendedItems(
+	forYouRepository: ForYouRepository,
+	query: GetItemsRequest,
+	filters: FilterOptions?,
+	startIndex: Int,
+	batchSize: Int,
+) {
+	ProcessLifecycleOwner.get().lifecycleScope.launch {
+		runCatching {
+			val response = forYouRepository.getRecommendedItems(
+				parentId = query.parentId,
+				includeItemTypes = query.includeItemTypes,
+				startIndex = startIndex,
+				limit = batchSize,
+				fields = query.fields,
+				isPlayed = if (filters?.isUnwatchedOnly == true) false else null,
+				isFavorite = if (filters?.isFavoriteOnly == true) true else null,
+			)
+
+			totalItems = response.totalRecordCount
+			setItems(
+				items = response.items,
+				transform = { item, _ ->
+					BaseItemDtoBaseRowItem(
+						item,
+						preferParentThumb,
+						isStaticHeight,
+					)
+				},
+			)
+
+			if (itemsLoaded == 0) removeRow()
 		}.fold(
 			onSuccess = { notifyRetrieveFinished() },
 			onFailure = { error -> notifyRetrieveFinished(error as? Exception) }

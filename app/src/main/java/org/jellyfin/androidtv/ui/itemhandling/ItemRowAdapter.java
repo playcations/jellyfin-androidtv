@@ -80,6 +80,7 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
 
     private ItemSortBy mSortBy;
     private SortOrder sortOrder;
+    private boolean recommendedSort = false;
     private FilterOptions mFilters;
 
     private EmptyResponse mRetrieveFinishedListener;
@@ -382,19 +383,23 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
     }
 
     public void setSortBy(BrowseGridFragment.SortOption option) {
-        if (!option.value.equals(mSortBy) || !option.order.equals(sortOrder)) {
+        if (!option.value.equals(mSortBy) || !option.order.equals(sortOrder) || option.recommended != recommendedSort) {
             mSortBy = option.value;
             sortOrder = option.order;
-            switch (queryType) {
-                case Artists:
-                    mArtistsQuery = ItemRowAdapterHelperKt.setArtistsSorting(mArtistsQuery, option);
-                    break;
-                case AlbumArtists:
-                    mAlbumArtistsQuery = ItemRowAdapterHelperKt.setAlbumArtistsSorting(mAlbumArtistsQuery, option);
-                    break;
-                default:
-                    mQuery = ItemRowAdapterHelperKt.setItemsSorting(mQuery, option);
-                    break;
+            recommendedSort = option.recommended;
+            // Recommended order is provided by the server plugin, the regular query sorting is unused
+            if (!recommendedSort) {
+                switch (queryType) {
+                    case Artists:
+                        mArtistsQuery = ItemRowAdapterHelperKt.setArtistsSorting(mArtistsQuery, option);
+                        break;
+                    case AlbumArtists:
+                        mAlbumArtistsQuery = ItemRowAdapterHelperKt.setAlbumArtistsSorting(mAlbumArtistsQuery, option);
+                        break;
+                    default:
+                        mQuery = ItemRowAdapterHelperKt.setItemsSorting(mQuery, option);
+                        break;
+                }
             }
             if (!ItemSortBy.SORT_NAME.equals(option.value)) {
                 setStartLetter(null);
@@ -404,6 +409,10 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
 
     public ItemSortBy getSortBy() {
         return mSortBy;
+    }
+
+    public boolean isRecommendedSort() {
+        return recommendedSort && queryType == QueryType.Items;
     }
 
     public SortOrder getSortOrder() {
@@ -558,7 +567,11 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
                 }
                 notifyRetrieveStarted();
 
-                ItemRowAdapterHelperKt.retrieveItems(this, api.getValue(), mQuery, itemsLoaded, chunkSize);
+                if (isRecommendedSort()) {
+                    ItemRowAdapterHelperKt.retrieveRecommendedItems(this, forYouRepository.getValue(), mQuery, mFilters, itemsLoaded, chunkSize);
+                } else {
+                    ItemRowAdapterHelperKt.retrieveItems(this, api.getValue(), mQuery, itemsLoaded, chunkSize);
+                }
                 break;
         }
     }
@@ -601,7 +614,9 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
         itemsLoaded = 0;
         switch (queryType) {
             case Items:
-                if (mQuery.getStartIndex() != null && mQuery.getLimit() != null) {
+                if (isRecommendedSort()) {
+                    ItemRowAdapterHelperKt.retrieveRecommendedItems(this, forYouRepository.getValue(), mQuery, mFilters, 0, chunkSize);
+                } else if (mQuery.getStartIndex() != null && mQuery.getLimit() != null) {
                     ItemRowAdapterHelperKt.retrieveItems(this, api.getValue(), mQuery, mQuery.getStartIndex(), mQuery.getLimit());
                 } else {
                     ItemRowAdapterHelperKt.retrieveItems(this, api.getValue(), mQuery, 0, chunkSize);

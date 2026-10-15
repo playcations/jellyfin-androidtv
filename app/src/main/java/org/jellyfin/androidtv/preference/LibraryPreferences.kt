@@ -30,5 +30,8 @@ class LibraryPreferences(
 		// Item sorting
 		val sortBy = enumPreference("SortBy", ItemSortBy.SORT_NAME)
 		val sortOrder = enumPreference("SortOrder", SortOrder.ASCENDING)
+
+		// "Recommended" sort from the For You server plugin, stored separately as it is not an ItemSortBy value
+		val sortRecommended = booleanPreference("SortRecommended", false)
 	}
 }

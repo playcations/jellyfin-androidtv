@@ -3,7 +3,10 @@ package org.jellyfin.androidtv.ui.browsing
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ComposeView
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import org.jellyfin.androidtv.data.repository.ForYouRepository
 import org.jellyfin.androidtv.ui.navigation.ProvideRouter
 import org.jellyfin.androidtv.ui.settings.Routes
 import org.jellyfin.androidtv.ui.settings.composable.SettingsDialog
@@ -37,5 +40,14 @@ fun BrowseGridFragment.addSettings(
 				SettingsRouterContent()
 			}
 		}
+	}
+}
+
+fun BrowseGridFragment.checkRecommendedSortAvailable(
+	forYouRepository: ForYouRepository,
+	callback: (available: Boolean) -> Unit,
+) {
+	lifecycleScope.launch {
+		callback(forYouRepository.isRecommendedSortAvailable())
 	}
 }
