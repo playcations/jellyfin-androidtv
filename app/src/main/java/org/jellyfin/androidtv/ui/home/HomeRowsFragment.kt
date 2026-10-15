@@ -110,7 +110,11 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 			// Actually add the sections
 			for (section in homesections) when (section) {
-				HomeSectionType.LATEST_MEDIA -> rows.add(helper.loadRecentlyAdded(userViewsRepository.views.first()))
+				HomeSectionType.LATEST_MEDIA -> {
+					// The For You rows already show the plugin's picks, skip its "Recently added" duplicate
+					val views = userViewsRepository.views.first()
+					rows.add(helper.loadRecentlyAdded(if (HomeSectionType.FOR_YOU in homesections) views.filterNot(HomeFragmentForYouRow::isForYouView) else views))
+				}
 				HomeSectionType.LIBRARY_TILES_SMALL -> rows.add(HomeFragmentViewsRow(small = false))
 				HomeSectionType.LIBRARY_BUTTONS -> rows.add(HomeFragmentViewsRow(small = true))
 				HomeSectionType.RESUME -> rows.add(helper.loadResumeVideo())

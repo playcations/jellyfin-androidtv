@@ -11,6 +11,8 @@ import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter
 import org.jellyfin.androidtv.ui.presentation.CardPresenter
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
+import org.jellyfin.sdk.model.api.BaseItemDto
+import org.jellyfin.sdk.model.api.BaseItemKind
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -52,5 +54,10 @@ class HomeFragmentForYouRow(
 	companion object {
 		// Amount of items loaded per page when scrolling through a row
 		const val CHUNK_SIZE = 20
+
+		// Name of the library view the server plugin adds for clients without For You rows
+		private const val FOR_YOU_VIEW_NAME = "For You"
+
+		fun isForYouView(item: BaseItemDto) = item.type == BaseItemKind.CHANNEL && item.name == FOR_YOU_VIEW_NAME
 	}
 }
