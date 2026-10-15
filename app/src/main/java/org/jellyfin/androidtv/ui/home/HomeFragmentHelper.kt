@@ -4,6 +4,7 @@ import android.content.Context
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.constant.ChangeTriggerType
+import org.jellyfin.androidtv.data.repository.ForYouRepository
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.ui.browsing.BrowseRowDef
@@ -20,6 +21,7 @@ class HomeFragmentHelper(
 	private val context: Context,
 	private val userRepository: UserRepository,
 	private val userPreferences: UserPreferences,
+	private val forYouRepository: ForYouRepository,
 ) {
 	fun loadRecentlyAdded(userViews: Collection<BaseItemDto>): HomeFragmentRow {
 		return HomeFragmentLatestRow(userRepository, userViews)
@@ -83,11 +85,23 @@ class HomeFragmentHelper(
 		return HomeFragmentBrowseRowDefRow(BrowseRowDef(context.getString(R.string.lbl_on_now), query))
 	}
 
+	suspend fun loadForYou(): HomeFragmentRow? {
+		val sections = forYouRepository.getSections(
+			sectionLimit = SECTION_LIMIT_FOR_YOU,
+			itemLimit = HomeFragmentForYouRow.CHUNK_SIZE,
+			fields = ItemRepository.browseFields,
+		)
+
+		if (sections.isEmpty()) return null
+		return HomeFragmentForYouRow(sections)
+	}
+
 	companion object {
 		// Maximum amount of items loaded for a row
 		private const val ITEM_LIMIT_RESUME = 50
 		private const val ITEM_LIMIT_RECORDINGS = 40
 		private const val ITEM_LIMIT_NEXT_UP = 50
 		private const val ITEM_LIMIT_ON_NOW = 20
+		private const val SECTION_LIMIT_FOR_YOU = 12
 	}
 }

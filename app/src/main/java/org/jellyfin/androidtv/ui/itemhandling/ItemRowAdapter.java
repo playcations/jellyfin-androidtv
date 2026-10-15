@@ -20,10 +20,12 @@ import org.jellyfin.androidtv.data.model.ChapterItemInfo;
 import org.jellyfin.androidtv.data.model.DataRefreshService;
 import org.jellyfin.androidtv.data.model.FilterOptions;
 import org.jellyfin.androidtv.data.querying.GetAdditionalPartsRequest;
+import org.jellyfin.androidtv.data.querying.GetForYouSectionItemsRequest;
 import org.jellyfin.androidtv.data.querying.GetSeriesTimersRequest;
 import org.jellyfin.androidtv.data.querying.GetSpecialsRequest;
 import org.jellyfin.androidtv.data.querying.GetTrailersRequest;
 import org.jellyfin.androidtv.data.querying.GetUserViewsRequest;
+import org.jellyfin.androidtv.data.repository.ForYouRepository;
 import org.jellyfin.androidtv.data.repository.UserViewsRepository;
 import org.jellyfin.androidtv.ui.GridButton;
 import org.jellyfin.androidtv.ui.browsing.BrowseGridFragment;
@@ -72,6 +74,8 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
     private GetAlbumArtistsRequest mAlbumArtistsQuery;
     private GetLatestMediaRequest mLatestQuery;
     private GetResumeItemsRequest resumeQuery;
+    private GetForYouSectionItemsRequest forYouQuery;
+    private List<BaseItemDto> forYouPreloadedItems;
     private QueryType queryType;
 
     private ItemSortBy mSortBy;
@@ -103,6 +107,7 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
 
     private final Lazy<org.jellyfin.sdk.api.client.ApiClient> api = inject(org.jellyfin.sdk.api.client.ApiClient.class);
     private final Lazy<UserViewsRepository> userViewsRepository = inject(UserViewsRepository.class);
+    private final Lazy<ForYouRepository> forYouRepository = inject(ForYouRepository.class);
     private Context context;
 
     private boolean isCurrentlyRetrieving() {
@@ -347,6 +352,18 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
         this.queryType = QueryType.Resume;
     }
 
+    public ItemRowAdapter(Context context, GetForYouSectionItemsRequest query, List<BaseItemDto> preloadedItems, int totalItems, int chunkSize, boolean preferParentThumb, Presenter presenter, MutableObjectAdapter<Row> parent) {
+        super(presenter);
+        this.context = context;
+        mParent = parent;
+        forYouQuery = query;
+        forYouPreloadedItems = preloadedItems;
+        this.totalItems = totalItems;
+        this.chunkSize = chunkSize;
+        this.preferParentThumb = preferParentThumb;
+        this.queryType = QueryType.ForYou;
+    }
+
     public void setItemsLoaded(int itemsLoaded) {
         this.itemsLoaded = itemsLoaded;
         this.fullyLoaded = chunkSize == 0 || itemsLoaded >= totalItems;
@@ -526,6 +543,15 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
                 ItemRowAdapterHelperKt.retrieveAlbumArtists(this, api.getValue(), mAlbumArtistsQuery, itemsLoaded, chunkSize);
                 break;
 
+            case ForYou:
+                if (forYouQuery == null) {
+                    return;
+                }
+
+                notifyRetrieveStarted();
+                ItemRowAdapterHelperKt.retrieveForYouSectionItems(this, forYouRepository.getValue(), forYouQuery, itemsLoaded, chunkSize);
+                break;
+
             default:
                 if (mQuery == null) {
                     return;
@@ -649,6 +675,17 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
                 break;
             case Resume:
                 ItemRowAdapterHelperKt.retrieveResumeItems(this, api.getValue(), resumeQuery);
+                break;
+            case ForYou:
+                if (forYouPreloadedItems != null) {
+                    // Use the items returned with the section list for the initial load
+                    List<BaseItemDto> preloadedItems = forYouPreloadedItems;
+                    forYouPreloadedItems = null;
+                    ItemRowAdapterHelperKt.setForYouSectionItems(this, preloadedItems);
+                    notifyRetrieveFinished();
+                } else {
+                    ItemRowAdapterHelperKt.retrieveForYouSectionItems(this, forYouRepository.getValue(), forYouQuery, 0, chunkSize);
+                }
                 break;
         }
     }

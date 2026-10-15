@@ -31,6 +31,7 @@ import org.jellyfin.androidtv.constant.LiveTvOption
 import org.jellyfin.androidtv.constant.QueryType
 import org.jellyfin.androidtv.data.model.DataRefreshService
 import org.jellyfin.androidtv.data.repository.CustomMessageRepository
+import org.jellyfin.androidtv.data.repository.ForYouRepository
 import org.jellyfin.androidtv.data.repository.NotificationsRepository
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.data.service.BackgroundService
@@ -72,11 +73,12 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private val userViewsRepository by inject<UserViewsRepository>()
 	private val dataRefreshService by inject<DataRefreshService>()
 	private val customMessageRepository by inject<CustomMessageRepository>()
+	private val forYouRepository by inject<ForYouRepository>()
 	private val navigationRepository by inject<NavigationRepository>()
 	private val itemLauncher by inject<ItemLauncher>()
 	private val keyProcessor by inject<KeyProcessor>()
 
-	private val helper by lazy { HomeFragmentHelper(requireContext(), userRepository, userPreferences) }
+	private val helper by lazy { HomeFragmentHelper(requireContext(), userRepository, userPreferences, forYouRepository) }
 
 	// Data
 	private var currentItem: BaseRowItem? = null
@@ -108,7 +110,11 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 			// Actually add the sections
 			for (section in homesections) when (section) {
-				HomeSectionType.LATEST_MEDIA -> rows.add(helper.loadRecentlyAdded(userViewsRepository.views.first()))
+				HomeSectionType.LATEST_MEDIA -> {
+					// The For You rows already show the plugin's picks, skip its "Recently added" duplicate
+					val views = userViewsRepository.views.first()
+					rows.add(helper.loadRecentlyAdded(if (HomeSectionType.FOR_YOU in homesections) views.filterNot(HomeFragmentForYouRow::isForYouView) else views))
+				}
 				HomeSectionType.LIBRARY_TILES_SMALL -> rows.add(HomeFragmentViewsRow(small = false))
 				HomeSectionType.LIBRARY_BUTTONS -> rows.add(HomeFragmentViewsRow(small = true))
 				HomeSectionType.RESUME -> rows.add(helper.loadResumeVideo())
@@ -121,6 +127,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 					rows.add(helper.loadOnNow())
 				}
 
+				HomeSectionType.FOR_YOU -> helper.loadForYou()?.let(rows::add)
 				HomeSectionType.NONE -> Unit
 			}
 
