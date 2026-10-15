@@ -432,6 +432,7 @@
     <string name="home_section_next_up">Next up</string>
     <string name="home_section_livetv">Live TV</string>
     <string name="home_section_for_you">For You (recommendations)</string>
+    <string name="home_for_you_description">Shown after Next up when the server has the For You plugin</string>
     <string name="home_section_none">None</string>
     <string name="home_section_i">Home section %1$d</string>
     <string name="home_next_up_max_days">Next up date cutoff</string>
