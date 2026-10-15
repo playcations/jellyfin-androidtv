@@ -40,6 +40,7 @@ import org.jellyfin.androidtv.constant.QueryType;
 import org.jellyfin.androidtv.data.model.FilterOptions;
 import org.jellyfin.androidtv.data.querying.GetUserViewsRequest;
 import org.jellyfin.androidtv.data.repository.CustomMessageRepository;
+import org.jellyfin.androidtv.data.repository.ForYouRepository;
 import org.jellyfin.androidtv.data.service.BackgroundService;
 import org.jellyfin.androidtv.databinding.HorizontalGridBrowseBinding;
 import org.jellyfin.androidtv.databinding.PopupEmptyBinding;
@@ -118,6 +119,13 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
     private final Lazy<ItemLauncher> itemLauncher = inject(ItemLauncher.class);
     private final Lazy<KeyProcessor> keyProcessor = inject(KeyProcessor.class);
     private final Lazy<ApiClient> api = inject(ApiClient.class);
+    private final Lazy<ForYouRepository> forYouRepository = inject(ForYouRepository.class);
+
+    private static final int SORT_OPTION_RECOMMENDED = 8;
+    private boolean mSupportsRecommendedSort = false;
+    @Nullable
+    private Boolean mRecommendedSortAvailable = null;
+    private boolean mWaitingForRecommendedSort = false;
 
     private int mCardsScreenEst = 0;
     private int mCardsScreenStride = 0;
@@ -186,6 +194,30 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
         setAutoCardGridValues();
         setupQueries();
         setupEventListeners();
+
+        // The "Recommended" sort is provided by the For You server plugin for movie and show libraries
+        mSupportsRecommendedSort = mRowDef.getQueryType() == QueryType.Items
+                && (mFolder.getType() == BaseItemKind.USER_VIEW || mFolder.getType() == BaseItemKind.COLLECTION_FOLDER)
+                && (mFolder.getCollectionType() == CollectionType.MOVIES || mFolder.getCollectionType() == CollectionType.TVSHOWS);
+        if (mSupportsRecommendedSort) {
+            BrowseGridFragmentHelperKt.checkRecommendedSortAvailable(this, forYouRepository.getValue(), available -> {
+                onRecommendedSortAvailability(available);
+                return null;
+            });
+        }
+    }
+
+    private void onRecommendedSortAvailability(boolean available) {
+        mRecommendedSortAvailable = available;
+        if (available) {
+            sortOptions.put(SORT_OPTION_RECOMMENDED, new SortOption(getString(R.string.lbl_recommended), ItemSortBy.DEFAULT, SortOrder.ASCENDING, true));
+        }
+
+        // Grid loading was postponed until we know if the saved sort option can be used
+        if (mWaitingForRecommendedSort) {
+            mWaitingForRecommendedSort = false;
+            if (mAdapter != null) loadGrid();
+        }
     }
 
     @Override
@@ -290,11 +322,17 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
         public String name;
         public ItemSortBy value;
         public SortOrder order;
+        public boolean recommended;
 
         public SortOption(String name, ItemSortBy value, SortOrder order) {
+            this(name, value, order, false);
+        }
+
+        public SortOption(String name, ItemSortBy value, SortOrder order, boolean recommended) {
             this.name = name;
             this.value = value;
             this.order = order;
+            this.recommended = recommended;
         }
     }
 
@@ -306,6 +344,19 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
         }
 
         return new SortOption(getString(R.string.lbl_bracket_unknown), ItemSortBy.SORT_NAME, SortOrder.ASCENDING);
+    }
+
+    private SortOption getSavedSortOption() {
+        // Only use the recommended sort when the server plugin is available, fall back to the regular sort otherwise
+        if (libraryPreferences.get(LibraryPreferences.Companion.getSortRecommended()) && Boolean.TRUE.equals(mRecommendedSortAvailable)) {
+            SortOption recommended = sortOptions.get(SORT_OPTION_RECOMMENDED);
+            if (recommended != null) return recommended;
+        }
+
+        ItemSortBy sortBy = libraryPreferences.get(LibraryPreferences.Companion.getSortBy());
+        // ItemSortBy.DEFAULT is only used for the recommended sort and should never be sent to the server
+        if (ItemSortBy.DEFAULT.equals(sortBy)) sortBy = ItemSortBy.SORT_NAME;
+        return getSortOption(sortBy);
     }
 
     public void setStatusText(String folderName) {
@@ -697,7 +748,14 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
             buildAdapter();
         }
 
-        mAdapter.setSortBy(getSortOption(libraryPreferences.get(LibraryPreferences.Companion.getSortBy())));
+        boolean savedRecommended = libraryPreferences.get(LibraryPreferences.Companion.getSortRecommended());
+        if (savedRecommended && mSupportsRecommendedSort && mRecommendedSortAvailable == null) {
+            // Wait for the plugin availability check, it calls loadGrid when done
+            mWaitingForRecommendedSort = true;
+            return;
+        }
+
+        mAdapter.setSortBy(getSavedSortOption());
         mAdapter.Retrieve();
     }
 
@@ -711,8 +769,12 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
         CoroutineUtils.runOnLifecycle(getLifecycle(), (coroutineScope, continuation) -> {
             libraryPreferences.set(LibraryPreferences.Companion.getFilterFavoritesOnly(), mAdapter.getFilters().isFavoriteOnly());
             libraryPreferences.set(LibraryPreferences.Companion.getFilterUnwatchedOnly(), mAdapter.getFilters().isUnwatchedOnly());
-            libraryPreferences.set(LibraryPreferences.Companion.getSortBy(), mAdapter.getSortBy());
-            libraryPreferences.set(LibraryPreferences.Companion.getSortOrder(), getSortOption(mAdapter.getSortBy()).order);
+            boolean recommended = mAdapter.isRecommendedSort();
+            libraryPreferences.set(LibraryPreferences.Companion.getSortRecommended(), recommended);
+            // Store name sort as regular sort for recommended so clients without the plugin fall back to it
+            ItemSortBy sortBy = recommended ? ItemSortBy.SORT_NAME : mAdapter.getSortBy();
+            libraryPreferences.set(LibraryPreferences.Companion.getSortBy(), sortBy);
+            libraryPreferences.set(LibraryPreferences.Companion.getSortOrder(), getSortOption(sortBy).order);
             return libraryPreferences.commit(continuation);
         });
     }
@@ -732,7 +794,7 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
                 PopupMenu sortMenu = new PopupMenu(getActivity(), binding.toolBar, Gravity.END);
                 for (Map.Entry<Integer, SortOption> entry : sortOptions.entrySet()) {
                     MenuItem item = sortMenu.getMenu().add(0, entry.getKey(), entry.getKey(), entry.getValue().name);
-                    item.setChecked(entry.getValue().value.equals(libraryPreferences.get(LibraryPreferences.Companion.getSortBy())));
+                    item.setChecked(entry.getValue().value.equals(mAdapter.getSortBy()));
                 }
                 sortMenu.getMenu().setGroupCheckable(0, true, true);
                 sortMenu.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
