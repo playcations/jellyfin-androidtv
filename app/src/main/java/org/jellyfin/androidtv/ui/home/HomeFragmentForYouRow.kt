@@ -4,6 +4,10 @@ import android.content.Context
 import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.Row
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.data.model.ForYouSection
 import org.jellyfin.androidtv.data.querying.GetForYouSectionItemsRequest
 import org.jellyfin.androidtv.data.repository.ItemRepository
@@ -18,16 +22,38 @@ import org.koin.core.component.inject
 
 /**
  * Personalized recommendation rows provided by the "For You" server plugin. Adds one row per section.
+ *
+ * The sections are loaded in the background so the rest of the home screen does not wait for them; when they arrive
+ * the rows are inserted where this section sits in the home layout. Nothing is added when the plugin is not installed.
  */
 class HomeFragmentForYouRow(
-	private val sections: List<ForYouSection>,
+	private val scope: CoroutineScope,
+	private val loadSections: suspend () -> List<ForYouSection>,
 ) : HomeFragmentRow, KoinComponent {
 	private val userPreferences by inject<UserPreferences>()
 
 	override fun addToRowsAdapter(context: Context, cardPresenter: CardPresenter, rowsAdapter: MutableObjectAdapter<Row>) {
+		// Remember the row before this section so the For You rows can be inserted right after it later
+		val previousRow = if (rowsAdapter.size() > 0) rowsAdapter.get(rowsAdapter.size() - 1) else null
+
+		scope.launch {
+			val sections = withContext(Dispatchers.IO) { loadSections() }
+			if (sections.isEmpty()) return@launch
+
+			var index = previousRow?.let { rowsAdapter.indexOf(it) + 1 } ?: 0
+			for (row in createRows(context, cardPresenter, rowsAdapter, sections)) rowsAdapter.add(index++, row)
+		}
+	}
+
+	private fun createRows(
+		context: Context,
+		cardPresenter: CardPresenter,
+		rowsAdapter: MutableObjectAdapter<Row>,
+		sections: List<ForYouSection>,
+	): List<ListRow> {
 		val preferParentThumb = userPreferences[UserPreferences.seriesThumbnailsEnabled]
 
-		for (section in sections) {
+		return sections.map { section ->
 			val query = GetForYouSectionItemsRequest(
 				sectionId = section.id,
 				fields = ItemRepository.browseFields,
@@ -47,7 +73,7 @@ class HomeFragmentForYouRow(
 			val row = ListRow(HeaderItem(section.title), rowAdapter)
 			rowAdapter.setRow(row)
 			rowAdapter.Retrieve()
-			rowsAdapter.add(row)
+			row
 		}
 	}
 

@@ -89,6 +89,11 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private val notificationsRow by lazy { NotificationsHomeFragmentRow(lifecycleScope, notificationsRepository) }
 	private val nowPlaying by lazy { HomeFragmentNowPlayingRow(lifecycleScope, playbackManager, mediaManager) }
 
+	// The For You rows already show the plugin's picks, so skip its "Recently added" duplicate when they are shown
+	private suspend fun latestMediaViews(homesections: Collection<HomeSectionType>) = userViewsRepository.views.first().let { views ->
+		if (HomeSectionType.FOR_YOU in homesections) views.filterNot(HomeFragmentForYouRow::isForYouView) else views
+	}
+
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 
@@ -110,11 +115,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 			// Actually add the sections
 			for (section in homesections) when (section) {
-				HomeSectionType.LATEST_MEDIA -> {
-					// The For You rows already show the plugin's picks, skip its "Recently added" duplicate
-					val views = userViewsRepository.views.first()
-					rows.add(helper.loadRecentlyAdded(if (HomeSectionType.FOR_YOU in homesections) views.filterNot(HomeFragmentForYouRow::isForYouView) else views))
-				}
+				HomeSectionType.LATEST_MEDIA -> rows.add(helper.loadRecentlyAdded(latestMediaViews(homesections)))
 				HomeSectionType.LIBRARY_TILES_SMALL -> rows.add(HomeFragmentViewsRow(small = false))
 				HomeSectionType.LIBRARY_BUTTONS -> rows.add(HomeFragmentViewsRow(small = true))
 				HomeSectionType.RESUME -> rows.add(helper.loadResumeVideo())
@@ -127,7 +128,8 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 					rows.add(helper.loadOnNow())
 				}
 
-				HomeSectionType.FOR_YOU -> helper.loadForYou()?.let(rows::add)
+				// Loads in the background and inserts its rows when ready, so the other rows don't wait for it
+				HomeSectionType.FOR_YOU -> rows.add(helper.loadForYou(lifecycleScope))
 				HomeSectionType.NONE -> Unit
 			}
 

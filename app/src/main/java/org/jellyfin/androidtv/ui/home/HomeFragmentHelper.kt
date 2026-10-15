@@ -1,6 +1,7 @@
 package org.jellyfin.androidtv.ui.home
 
 import android.content.Context
+import kotlinx.coroutines.CoroutineScope
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.constant.ChangeTriggerType
@@ -85,15 +86,12 @@ class HomeFragmentHelper(
 		return HomeFragmentBrowseRowDefRow(BrowseRowDef(context.getString(R.string.lbl_on_now), query))
 	}
 
-	suspend fun loadForYou(): HomeFragmentRow? {
-		val sections = forYouRepository.getSections(
+	fun loadForYou(scope: CoroutineScope): HomeFragmentRow = HomeFragmentForYouRow(scope) {
+		forYouRepository.getSections(
 			sectionLimit = SECTION_LIMIT_FOR_YOU,
 			itemLimit = HomeFragmentForYouRow.CHUNK_SIZE,
 			fields = ItemRepository.browseFields,
 		)
-
-		if (sections.isEmpty()) return null
-		return HomeFragmentForYouRow(sections)
 	}
 
 	companion object {
