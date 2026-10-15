@@ -23,8 +23,8 @@ class UserSettingPreferences(
 		val homesection3 = enumPreference("homesection3", HomeSectionType.RESUME_BOOK)
 		val homesection4 = enumPreference("homesection4", HomeSectionType.LIVE_TV)
 		val homesection5 = enumPreference("homesection5", HomeSectionType.NEXT_UP)
-		val homesection6 = enumPreference("homesection6", HomeSectionType.LATEST_MEDIA)
-		val homesection7 = enumPreference("homesection7", HomeSectionType.NONE)
+		val homesection6 = enumPreference("homesection6", HomeSectionType.FOR_YOU)
+		val homesection7 = enumPreference("homesection7", HomeSectionType.LATEST_MEDIA)
 		val homesection8 = enumPreference("homesection8", HomeSectionType.NONE)
 		val homesection9 = enumPreference("homesection9", HomeSectionType.NONE)
 	}

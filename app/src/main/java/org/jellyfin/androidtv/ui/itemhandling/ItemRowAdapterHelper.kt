@@ -10,8 +10,10 @@ import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.constant.LiveTvOption
 import org.jellyfin.androidtv.data.querying.GetAdditionalPartsRequest
+import org.jellyfin.androidtv.data.querying.GetForYouSectionItemsRequest
 import org.jellyfin.androidtv.data.querying.GetSpecialsRequest
 import org.jellyfin.androidtv.data.querying.GetTrailersRequest
+import org.jellyfin.androidtv.data.repository.ForYouRepository
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.ui.GridButton
 import org.jellyfin.androidtv.ui.browsing.BrowseGridFragment.SortOption
@@ -25,6 +27,7 @@ import org.jellyfin.sdk.api.client.extensions.tvShowsApi
 import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.api.client.extensions.userViewsApi
 import org.jellyfin.sdk.api.client.extensions.videosApi
+import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.ItemFilter
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SeriesTimerInfoDto
@@ -589,6 +592,45 @@ fun ItemRowAdapter.retrieveItems(
 			)
 
 			if (itemsLoaded == 0) removeRow()
+		}.fold(
+			onSuccess = { notifyRetrieveFinished() },
+			onFailure = { error -> notifyRetrieveFinished(error as? Exception) }
+		)
+	}
+}
+
+fun ItemRowAdapter.setForYouSectionItems(items: List<BaseItemDto>) {
+	setItems(
+		items = items,
+		transform = { item, _ ->
+			BaseItemDtoBaseRowItem(
+				item,
+				preferParentThumb,
+				isStaticHeight,
+			)
+		},
+	)
+
+	if (itemsLoaded == 0) removeRow()
+}
+
+fun ItemRowAdapter.retrieveForYouSectionItems(
+	forYouRepository: ForYouRepository,
+	query: GetForYouSectionItemsRequest,
+	startIndex: Int,
+	batchSize: Int,
+) {
+	ProcessLifecycleOwner.get().lifecycleScope.launch {
+		runCatching {
+			val response = forYouRepository.getSectionItems(
+				sectionId = query.sectionId,
+				startIndex = startIndex,
+				limit = batchSize,
+				fields = query.fields,
+			)
+
+			totalItems = response.totalRecordCount
+			setForYouSectionItems(response.items)
 		}.fold(
 			onSuccess = { notifyRetrieveFinished() },
 			onFailure = { error -> notifyRetrieveFinished(error as? Exception) }

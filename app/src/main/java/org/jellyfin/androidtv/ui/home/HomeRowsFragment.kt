@@ -31,6 +31,7 @@ import org.jellyfin.androidtv.constant.LiveTvOption
 import org.jellyfin.androidtv.constant.QueryType
 import org.jellyfin.androidtv.data.model.DataRefreshService
 import org.jellyfin.androidtv.data.repository.CustomMessageRepository
+import org.jellyfin.androidtv.data.repository.ForYouRepository
 import org.jellyfin.androidtv.data.repository.NotificationsRepository
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.data.service.BackgroundService
@@ -72,11 +73,12 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private val userViewsRepository by inject<UserViewsRepository>()
 	private val dataRefreshService by inject<DataRefreshService>()
 	private val customMessageRepository by inject<CustomMessageRepository>()
+	private val forYouRepository by inject<ForYouRepository>()
 	private val navigationRepository by inject<NavigationRepository>()
 	private val itemLauncher by inject<ItemLauncher>()
 	private val keyProcessor by inject<KeyProcessor>()
 
-	private val helper by lazy { HomeFragmentHelper(requireContext(), userRepository, userPreferences) }
+	private val helper by lazy { HomeFragmentHelper(requireContext(), userRepository, userPreferences, forYouRepository) }
 
 	// Data
 	private var currentItem: BaseRowItem? = null
@@ -121,6 +123,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 					rows.add(helper.loadOnNow())
 				}
 
+				HomeSectionType.FOR_YOU -> helper.loadForYou()?.let(rows::add)
 				HomeSectionType.NONE -> Unit
 			}
 
