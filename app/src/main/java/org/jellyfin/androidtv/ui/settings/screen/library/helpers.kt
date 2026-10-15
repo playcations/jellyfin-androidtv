@@ -14,7 +14,8 @@ import java.util.UUID
 fun rememberUserView(itemId: UUID): BaseItemDto? {
 	val userViewsRepository = koinInject<UserViewsRepository>()
 	val userView by remember {
-		userViewsRepository.views.map { views -> views.first { view -> view.id == itemId } }
+		// Grids inside folders (e.g. plugin channel folders) open these settings with an id that is not a top-level view
+		userViewsRepository.views.map { views -> views.firstOrNull { view -> view.id == itemId } }
 	}.collectAsState(null)
 	return userView
 }
