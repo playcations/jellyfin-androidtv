@@ -17,6 +17,7 @@ class UserRepositoryImpl : UserRepository {
 	override val currentUser = MutableStateFlow<UserDto?>(null)
 
 	override fun setCurrentUser(user: UserDto?) {
+		org.jellyfin.androidtv.ui.livetv.TvManager.clearCaches()
 		currentUser.value = user
 	}
 }

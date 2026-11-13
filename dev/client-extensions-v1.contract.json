@@ -1,0 +1,48 @@
+{
+  "protocolVersion": 1,
+  "purpose": "Shared implementation contract for the Familyfin native client and server bridge prototypes.",
+  "wireFormat": "Envelope fields are explicitly camelCase. Embedded media is the standard Jellyfin BaseItemDto with its normal wire field names.",
+  "authentication": "Existing authenticated Jellyfin viewer session. Every endpoint rechecks viewer and provider permissions. Never require admin for discovery or accept a caller-selected user identity.",
+  "endpoints": {
+    "GET /ClientExtensions/v1": {
+      "protocolVersion": 1,
+      "extensions": [{"id": "provider-id", "title": "Provider title", "version": "1.0.0", "entryPoints": [{"id": "entry-id", "title": "Entry title", "screenId": "root"}], "homeRows": [{"id": "row-id", "title": "Row title", "screenId": "row-screen-id"}]}]
+    },
+    "GET /ClientExtensions/v1/extensions/{extensionId}/screens/{screenId}?startIndex=0&limit=40": {
+      "protocolVersion": 1,
+      "id": "screen-id",
+      "title": "Screen title",
+      "view": "grid",
+      "startIndex": 0,
+      "totalRecordCount": 1,
+      "items": [{"id": "entry-id", "title": "Entry title", "imageUrl": null, "media": null, "action": {"type": "openScreen", "extensionId": "provider-id", "screenId": "next-screen-id"}}]
+    },
+    "GET /ClientExtensions/v1/extensions/{extensionId}/guide-scopes/{scopeId}": {
+      "protocolVersion": 1,
+      "id": "scope-id",
+      "title": "Guide title",
+      "channelIds": ["00000000-0000-0000-0000-000000000001"]
+    }
+  },
+  "views": ["grid", "categories"],
+  "actions": [
+    {"type": "openScreen", "extensionId": "provider-id", "screenId": "screen-id"},
+    {"type": "openItem", "itemId": "jellyfin-item-uuid"},
+    {"type": "playItem", "itemId": "jellyfin-item-uuid"},
+    {"type": "openGuide", "extensionId": "provider-id", "scopeId": "scope-id"}
+  ],
+  "limits": {"identifierLength": 200, "pageSize": 100, "guideChannelCount": 10000},
+  "identifierRules": "Stable opaque IDs using letters, numbers, dot, underscore, colon and hyphen; no path separators, traversal, query strings, absolute URLs or control characters. Adapters may use base64url to encode legacy provider IDs.",
+  "behavior": [
+    "Discovery hides inaccessible providers. Missing server bridge is normal and must not break the stock client.",
+    "Only same connected-server API requests; never attach credentials to plugin-supplied external origins.",
+    "Unknown protocol versions and action types are isolated to the extension and shown as unavailable, never guessed.",
+    "Native client has no special branches on provider IDs. Providers can be added through the server contract without client changes.",
+    "openGuide resolves a viewer-authorized scope immediately before navigation. Empty, denied or failed scopes never fall back to all channels.",
+    "Guide caches and lifecycle are isolated by server, viewer and scope; Back returns to the selected extension category.",
+    "Existing user home-row preferences remain respected; do not force disabled Live TV or On Now rows back onto home.",
+    "No server or household-device deployment during development. Validate on isolated fixtures/dev containers and emulators."
+  ],
+  "initialProviders": ["For You sections and paged media", "Active Live-TV Control Center hierarchy and native guide scopes"],
+  "acceptance": ["Viewer authorization and revoked access", "For You row added/reordered without APK change", "Nested Live TV category to correctly scoped guide and one Back", "Third provider rendered without client branches", "D-pad-only extension navigation", "Plugin absent, removed, malformed and unsupported-version handling"]
+}

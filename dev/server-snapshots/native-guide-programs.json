@@ -1,0 +1,26 @@
+{
+  "Items": [
+    {
+      "Name": "Fixture Program 1",
+      "ServerId": "f6abfc3ab6564e0ca8c1a96a3140f78d",
+      "Id": "fceab9ea88c0213eb1c2daf396f9d3d3",
+      "ChannelId": "c74c69e6e2e1c351a1fe6a311977bed0",
+      "RunTimeTicks": 108000000000,
+      "Type": "Program",
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 0,
+        "IsFavorite": false,
+        "Played": false,
+        "Key": "fceab9ea-88c0-213e-b1c2-daf396f9d3d3",
+        "ItemId": "fceab9ea88c0213eb1c2daf396f9d3d3"
+      },
+      "ImageTags": {},
+      "BackdropImageTags": [],
+      "ImageBlurHashes": {},
+      "MediaType": "Unknown",
+      "EndDate": "2026-11-13T22:59:14.0000000Z",
+      "StartDate": "2026-11-13T19:59:14.0000000Z"
+    }
+  ]
+}

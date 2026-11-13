@@ -1,0 +1,88 @@
+{
+  "id": "group-e1eee419dec94dd8b92d918b2475f5af",
+  "title": "Sports",
+  "view": "categories",
+  "startIndex": 0,
+  "totalRecordCount": 3,
+  "items": [
+    {
+      "id": "guide",
+      "title": "Guide: Sports",
+      "action": {
+        "type": "openGuide",
+        "extensionId": "live-tv",
+        "scopeId": "group-e1eee419dec94dd8b92d918b2475f5af"
+      },
+      "imageUrl": null,
+      "media": null
+    },
+    {
+      "id": "group-1865c07771924b37a3339c1bd0bee86a",
+      "title": "Local",
+      "action": {
+        "type": "openScreen",
+        "extensionId": "live-tv",
+        "screenId": "group-1865c07771924b37a3339c1bd0bee86a"
+      },
+      "imageUrl": null,
+      "media": null
+    },
+    {
+      "id": "c74c69e6-e2e1-c351-a1fe-6a311977bed0",
+      "title": "Fixture One",
+      "action": {
+        "type": "playItem",
+        "itemId": "c74c69e6-e2e1-c351-a1fe-6a311977bed0"
+      },
+      "imageUrl": null,
+      "media": {
+        "Name": "Fixture One",
+        "ServerId": "f6abfc3ab6564e0ca8c1a96a3140f78d",
+        "Id": "c74c69e6e2e1c351a1fe6a311977bed0",
+        "ChannelId": null,
+        "Number": "1",
+        "ChannelNumber": "1",
+        "IsFolder": false,
+        "Type": "TvChannel",
+        "UserData": {
+          "PlaybackPositionTicks": 0,
+          "PlayCount": 0,
+          "IsFavorite": false,
+          "Played": false,
+          "Key": "c74c69e6-e2e1-c351-a1fe-6a311977bed0",
+          "ItemId": "c74c69e6e2e1c351a1fe6a311977bed0"
+        },
+        "ImageTags": {},
+        "BackdropImageTags": [],
+        "ImageBlurHashes": {},
+        "LocationType": "Remote",
+        "MediaType": "Video",
+        "ChannelType": "TV",
+        "CurrentProgram": {
+          "Name": "Fixture Program 1",
+          "ServerId": "f6abfc3ab6564e0ca8c1a96a3140f78d",
+          "Id": "fceab9ea88c0213eb1c2daf396f9d3d3",
+          "ChannelId": "c74c69e6e2e1c351a1fe6a311977bed0",
+          "Overview": "Synthetic guide data",
+          "RunTimeTicks": 108000000000,
+          "Type": "Program",
+          "UserData": {
+            "PlaybackPositionTicks": 0,
+            "PlayCount": 0,
+            "IsFavorite": false,
+            "Played": false,
+            "Key": "fceab9ea-88c0-213e-b1c2-daf396f9d3d3",
+            "ItemId": "fceab9ea88c0213eb1c2daf396f9d3d3"
+          },
+          "ImageTags": {},
+          "BackdropImageTags": [],
+          "ImageBlurHashes": {},
+          "MediaType": "Unknown",
+          "EndDate": "2026-11-13T22:59:14.0000000Z",
+          "StartDate": "2026-11-13T19:59:14.0000000Z"
+        }
+      }
+    }
+  ],
+  "protocolVersion": 1
+}

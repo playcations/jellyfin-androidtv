@@ -23,6 +23,8 @@ import org.jellyfin.androidtv.ui.playback.stillwatching.StillWatchingFragment
 import org.jellyfin.androidtv.ui.player.photo.PhotoPlayerFragment
 import org.jellyfin.androidtv.ui.player.video.VideoPlayerFragment
 import org.jellyfin.androidtv.ui.search.SearchFragment
+import org.jellyfin.androidtv.extensions.ExtensionScreenFragment
+import org.jellyfin.androidtv.extensions.ExtensionSession
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SeriesTimerInfoDto
@@ -31,6 +33,22 @@ import java.util.UUID
 
 @Suppress("TooManyFunctions")
 object Destinations {
+	fun extensionScreen(extension: String? = null, screen: String? = null, session: ExtensionSession) =
+		fragmentDestination<ExtensionScreenFragment> {
+			putString(ExtensionScreenFragment.ARG_EXTENSION, extension)
+			putString(ExtensionScreenFragment.ARG_SCREEN, screen)
+			putString(ExtensionScreenFragment.ARG_SERVER, session.server)
+			putString(ExtensionScreenFragment.ARG_USER, session.user)
+		}
+
+	fun extensionGuide(extension: String, scope: String, session: ExtensionSession) =
+		fragmentDestination<LiveTvGuideFragment> {
+			putString(ExtensionScreenFragment.ARG_EXTENSION, extension)
+			putString(ExtensionScreenFragment.ARG_SCOPE, scope)
+			putString(ExtensionScreenFragment.ARG_SERVER, session.server)
+			putString(ExtensionScreenFragment.ARG_USER, session.user)
+		}
+
 	// General
 	val home = fragmentDestination<HomeFragment>()
 	fun search(query: String? = null) = fragmentDestination<SearchFragment> {

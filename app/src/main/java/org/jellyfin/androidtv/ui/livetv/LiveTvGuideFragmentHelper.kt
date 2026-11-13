@@ -6,11 +6,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
+import org.jellyfin.androidtv.extensions.EXTENSION_REVALIDATION_INTERVAL_MS
+import org.jellyfin.androidtv.extensions.ExtensionScreenFragment
 import org.jellyfin.androidtv.data.model.DataRefreshService
 import org.jellyfin.androidtv.data.repository.ItemMutationRepository
 import org.jellyfin.androidtv.databinding.LiveTvGuideBinding
@@ -69,12 +72,18 @@ fun LiveTvGuideFragment.toggleFavorite() {
 
 fun LiveTvGuideFragment.refreshSelectedProgram() {
 	val api by inject<ApiClient>()
+	val users by inject<org.jellyfin.androidtv.auth.repository.UserRepository>()
+	val repository = org.jellyfin.androidtv.extensions.ExtensionRepository(api, users)
+	val viewer = repository.currentSession() ?: return
+	val selected = mSelectedProgram?.id ?: return
 
-	lifecycleScope.launch {
+	viewLifecycleOwner.lifecycleScope.launch {
 		runCatching {
 			val item = withContext(Dispatchers.IO) {
-				api.userLibraryApi.getItem(mSelectedProgram.id).content
+				api.userLibraryApi.getItem(selected).content
 			}
+			require(repository.currentSession() == viewer)
+			if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) || mSelectedProgram?.id != selected) return@launch
 			mSelectedProgram = item
 		}.onFailure { error ->
 			Timber.e(error, "Unable to get program details")
@@ -134,4 +143,33 @@ fun LiveTvGuideFragment.addSettingsFilters(binding: LiveTvGuideBinding): Mutable
 	}
 
 	return visible
+}
+
+/** Revalidate visible scopes and erase the guide immediately when its viewer changes. */
+fun LiveTvGuideFragment.observeExtensionViewer() {
+	val users by inject<org.jellyfin.androidtv.auth.repository.UserRepository>()
+	val api by inject<ApiClient>()
+	val repository = org.jellyfin.androidtv.extensions.ExtensionRepository(api, users)
+	val initial = repository.currentSession()
+	viewLifecycleOwner.lifecycleScope.launch {
+		viewLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+			launch {
+				users.currentUser.collect { if (repository.currentSession() != initial) extensionUnavailable() }
+			}
+			if (arguments?.containsKey(org.jellyfin.androidtv.extensions.ExtensionScreenFragment.ARG_SCOPE) == true) launch {
+				while (!guideSession.isUnavailable) {
+					kotlinx.coroutines.delay(EXTENSION_REVALIDATION_INTERVAL_MS)
+					runCatching {
+						val generation = guideSession.generation
+						require(repository.currentSession() == initial)
+						val scope = repository.guide(
+							requireArguments().getString(ExtensionScreenFragment.ARG_EXTENSION)!!,
+							requireArguments().getString(ExtensionScreenFragment.ARG_SCOPE)!!,
+						)
+						guideSession.authorize(generation, scope.channelIds)
+					}.onFailure { extensionUnavailable() }
+				}
+			}
+		}
+	}
 }
