@@ -7,3 +7,8 @@ local.properties
 .kotlin/
 build/
 captures/
+
+# Local isolated native prototype verification
+.emulator/
+*.log
+__pycache__/

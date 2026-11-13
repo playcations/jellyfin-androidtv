@@ -1,0 +1,32 @@
+{
+  "id": "root",
+  "title": "Live TV categories",
+  "view": "categories",
+  "startIndex": 0,
+  "totalRecordCount": 2,
+  "items": [
+    {
+      "id": "group-e1eee419dec94dd8b92d918b2475f5af",
+      "title": "Sports",
+      "action": {
+        "type": "openScreen",
+        "extensionId": "live-tv",
+        "screenId": "group-e1eee419dec94dd8b92d918b2475f5af"
+      },
+      "imageUrl": null,
+      "media": null
+    },
+    {
+      "id": "group-4bed43fd4dfc458893582a1f4c1798da",
+      "title": "News",
+      "action": {
+        "type": "openScreen",
+        "extensionId": "live-tv",
+        "screenId": "group-4bed43fd4dfc458893582a1f4c1798da"
+      },
+      "imageUrl": null,
+      "media": null
+    }
+  ],
+  "protocolVersion": 1
+}

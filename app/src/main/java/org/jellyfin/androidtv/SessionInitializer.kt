@@ -19,8 +19,15 @@ class SessionInitializer : Initializer<Unit> {
 
 		// Restore system session
 		ProcessLifecycleOwner.get().lifecycleScope.launch(Dispatchers.IO) {
-			koin.get<SessionRepository>().restoreSession(destroyOnly = false)
+			try {
+				koin.get<SessionRepository>().restoreSession(destroyOnly = false)
+			} finally { restored.complete(Unit) }
 		}
+	}
+
+	companion object {
+		/** Awaitable startup boundary used by the debug-only isolated fixture harness. */
+		val restored = kotlinx.coroutines.CompletableDeferred<Unit>()
 	}
 
 	override fun dependencies() = listOf(KoinInitializer::class.java)

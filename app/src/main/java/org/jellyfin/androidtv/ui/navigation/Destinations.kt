@@ -31,6 +31,21 @@ import java.util.UUID
 
 @Suppress("TooManyFunctions")
 object Destinations {
+	fun extensionScreen(extension: String? = null, screen: String? = null, session: org.jellyfin.androidtv.extensions.ExtensionSession) =
+		fragmentDestination<org.jellyfin.androidtv.extensions.ExtensionScreenFragment> {
+			putString(org.jellyfin.androidtv.extensions.ExtensionScreenFragment.ARG_EXTENSION, extension)
+			putString(org.jellyfin.androidtv.extensions.ExtensionScreenFragment.ARG_SCREEN, screen)
+			putString(org.jellyfin.androidtv.extensions.ExtensionScreenFragment.ARG_SERVER, session.server)
+			putString(org.jellyfin.androidtv.extensions.ExtensionScreenFragment.ARG_USER, session.user)
+		}
+
+	fun extensionGuide(extension: String, scope: String, session: org.jellyfin.androidtv.extensions.ExtensionSession) = fragmentDestination<LiveTvGuideFragment> {
+		putString(org.jellyfin.androidtv.extensions.ExtensionScreenFragment.ARG_EXTENSION, extension)
+		putString(org.jellyfin.androidtv.extensions.ExtensionScreenFragment.ARG_SCOPE, scope)
+		putString(org.jellyfin.androidtv.extensions.ExtensionScreenFragment.ARG_SERVER, session.server)
+			putString(org.jellyfin.androidtv.extensions.ExtensionScreenFragment.ARG_USER, session.user)
+	}
+
 	// General
 	val home = fragmentDestination<HomeFragment>()
 	fun search(query: String? = null) = fragmentDestination<SearchFragment> {

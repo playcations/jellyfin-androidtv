@@ -1,0 +1,82 @@
+{
+  "id": "root",
+  "title": "Recently added (up to 100)",
+  "view": "grid",
+  "startIndex": 0,
+  "totalRecordCount": 3,
+  "items": [
+    {
+      "id": "009f5d40-da1a-a9da-4408-c2c6481aff54",
+      "title": "Fixture Movie 1",
+      "action": {
+        "type": "openItem",
+        "itemId": "009f5d40-da1a-a9da-4408-c2c6481aff54"
+      },
+      "imageUrl": null,
+      "media": {
+        "Name": "Fixture Movie 1",
+        "ServerId": "f6abfc3ab6564e0ca8c1a96a3140f78d",
+        "Id": "009f5d40da1aa9da4408c2c6481aff54",
+        "Container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "ChannelId": null,
+        "Overview": "Synthetic local test media",
+        "CommunityRating": 8,
+        "RunTimeTicks": 10000000,
+        "ProductionYear": 2026,
+        "IsFolder": false,
+        "Type": "Movie",
+        "UserData": {
+          "PlaybackPositionTicks": 0,
+          "PlayCount": 0,
+          "IsFavorite": false,
+          "Played": false,
+          "Key": "009f5d40-da1a-a9da-4408-c2c6481aff54",
+          "ItemId": "009f5d40da1aa9da4408c2c6481aff54"
+        },
+        "VideoType": "VideoFile",
+        "ImageTags": {},
+        "BackdropImageTags": [],
+        "ImageBlurHashes": {},
+        "LocationType": "FileSystem",
+        "MediaType": "Video"
+      }
+    },
+    {
+      "id": "a160b5e6-b4dc-b072-95ec-b1a7d54a563c",
+      "title": "Fixture Movie 2",
+      "action": {
+        "type": "openItem",
+        "itemId": "a160b5e6-b4dc-b072-95ec-b1a7d54a563c"
+      },
+      "imageUrl": null,
+      "media": {
+        "Name": "Fixture Movie 2",
+        "ServerId": "f6abfc3ab6564e0ca8c1a96a3140f78d",
+        "Id": "a160b5e6b4dcb07295ecb1a7d54a563c",
+        "Container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "ChannelId": null,
+        "Overview": "Synthetic local test media",
+        "CommunityRating": 8,
+        "RunTimeTicks": 10000000,
+        "ProductionYear": 2026,
+        "IsFolder": false,
+        "Type": "Movie",
+        "UserData": {
+          "PlaybackPositionTicks": 0,
+          "PlayCount": 0,
+          "IsFavorite": false,
+          "Played": false,
+          "Key": "a160b5e6-b4dc-b072-95ec-b1a7d54a563c",
+          "ItemId": "a160b5e6b4dcb07295ecb1a7d54a563c"
+        },
+        "VideoType": "VideoFile",
+        "ImageTags": {},
+        "BackdropImageTags": [],
+        "ImageBlurHashes": {},
+        "LocationType": "FileSystem",
+        "MediaType": "Video"
+      }
+    }
+  ],
+  "protocolVersion": 1
+}

@@ -87,6 +87,22 @@ public class LiveTvGuideFragment extends Fragment implements LiveTvGuide, View.O
     RelativeLayout mSelectedProgramView;
 
     private List<BaseItemDto> mAllChannels;
+    private final NativeGuideSession guideSession = new NativeGuideSession();
+    public NativeGuideSession getGuideSession() { return guideSession; }
+    public void extensionUnavailable() {
+        if (mDisplayProgramsTask != null) mDisplayProgramsTask.cancel(true);
+        if (mDetailPopup != null) mDetailPopup.dismiss();
+        guideSession.clear();
+        mSummary.setText("");
+        mImage.setVisibility(View.INVISIBLE);
+        mInfoRow.removeAllViews();
+        mAllChannels = java.util.Collections.emptyList();
+        mChannels.removeAllViews();
+        mProgramRows.removeAllViews();
+        mSpinner.setVisibility(View.GONE);
+        mTitle.setText("Guide unavailable or access changed");
+        mSelectedProgram = null;
+    }
     private UUID mFirstFocusChannelId;
     private boolean focusAtEnd;
     private GuideFilters mFilters = new GuideFilters();
@@ -214,14 +230,24 @@ public class LiveTvGuideFragment extends Fragment implements LiveTvGuide, View.O
         return binding.getRoot();
     }
 
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        LiveTvGuideFragmentHelperKt.observeExtensionViewer(this);
+    }
+
     private int getGuideHours() {
         return mFilters.any() ? FILTERED_HOURS : NORMAL_HOURS;
     }
 
     private void load() {
+        if (mDisplayProgramsTask != null) mDisplayProgramsTask.cancel(true);
+        mChannels.removeAllViews();
+        mProgramRows.removeAllViews();
+        mSelectedProgram = null;
         mCurrentGuideStart = LocalDateTime.now();
         fillTimeLine(mCurrentGuideStart, getGuideHours());
-        TvManager.loadAllChannels(this, ndx -> {
+        guideSession.loadAllChannels(this, ndx -> {
             if (ndx >= PAGE_SIZE) {
                 // last channel is not in first page so grab a set where it will be in the middle
                 ndx = ndx - (PAGE_SIZE / 2);
@@ -229,7 +255,7 @@ public class LiveTvGuideFragment extends Fragment implements LiveTvGuide, View.O
                 ndx = 0; // just start at beginning
             }
 
-            mAllChannels = TvManager.getAllChannels();
+            mAllChannels = guideSession.getAllChannels();
             if (!mAllChannels.isEmpty()) {
                 displayChannels(ndx, PAGE_SIZE);
             } else {
@@ -258,7 +284,7 @@ public class LiveTvGuideFragment extends Fragment implements LiveTvGuide, View.O
     }
 
     protected void doLoad() {
-        if (TvManager.shouldForceReload() || mCurrentGuideStart.plusMinutes(30).isBefore(LocalDateTime.now()) || mChannels.getChildCount() == 0) {
+        if (getArguments() != null && getArguments().containsKey("extensionScopeId") || TvManager.shouldForceReload() || mCurrentGuideStart.plusMinutes(30).isBefore(LocalDateTime.now()) || mChannels.getChildCount() == 0) {
             load();
 
             mFirstFocusChannelId = TvManager.getLastLiveTvChannel();
@@ -268,6 +294,10 @@ public class LiveTvGuideFragment extends Fragment implements LiveTvGuide, View.O
     @Override
     public void onPause() {
         super.onPause();
+        guideSession.clear();
+        mChannels.removeAllViews();
+        mProgramRows.removeAllViews();
+        mSelectedProgram = null;
 
         if (mDisplayProgramsTask != null) {
             mDisplayProgramsTask.cancel(true);
@@ -480,7 +510,7 @@ public class LiveTvGuideFragment extends Fragment implements LiveTvGuide, View.O
         mChannels.removeAllViews();
         mChannelStatus.setText("");
         mFilterStatus.setText("");
-        TvManager.getProgramsAsync(this, mCurrentDisplayChannelStartNdx, mCurrentDisplayChannelEndNdx, mCurrentGuideStart, mCurrentGuideEnd, new EmptyResponse(getLifecycle()) {
+        guideSession.getProgramsAsync(this, mCurrentDisplayChannelStartNdx, mCurrentDisplayChannelEndNdx, mCurrentGuideStart, mCurrentGuideEnd, new EmptyResponse(getLifecycle()) {
             @Override
             public void onResponse() {
                 if (!isActive()) return;
@@ -523,6 +553,7 @@ public class LiveTvGuideFragment extends Fragment implements LiveTvGuide, View.O
 
         @Override
         protected Void doInBackground(Integer... params) {
+            final DisplayProgramsTask task = this;
             int start = params[0];
             int end = params[1];
             boolean first = true;
@@ -531,9 +562,9 @@ public class LiveTvGuideFragment extends Fragment implements LiveTvGuide, View.O
             LinearLayout prevRow = null;
             for (int i = start; i <= end; i++) {
                 if (isCancelled()) return null;
-                final BaseItemDto channel = TvManager.getChannel(i);
+                final BaseItemDto channel = guideSession.getChannel(i);
                 if (channel == null) continue;
-                List<BaseItemDto> programs = TvManager.getProgramsForChannel(channel.getId(), mFilters);
+                List<BaseItemDto> programs = guideSession.getProgramsForChannel(channel.getId(), mFilters);
                 final LinearLayout row = getProgramRow(programs, channel.getId());
                 if (row == null) continue; // no row to show
 
@@ -553,7 +584,7 @@ public class LiveTvGuideFragment extends Fragment implements LiveTvGuide, View.O
                 requireActivity().runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        if (!getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) return;
+                        if (task.isCancelled() || !getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.RESUMED)) return;
 
                         GuideChannelHeader header = getChannelHeader(requireContext(), channel);
                         mChannels.addView(header);
@@ -738,7 +769,7 @@ public class LiveTvGuideFragment extends Fragment implements LiveTvGuide, View.O
     private Runnable detailUpdateTask = new Runnable() {
         @Override
         public void run() {
-            if (!getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) return;
+            if ((mDisplayProgramsTask != null && mDisplayProgramsTask.isCancelled()) || !getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.RESUMED)) return;
             LiveTvGuideFragmentHelperKt.refreshSelectedProgram(LiveTvGuideFragment.this);
         }
     };
@@ -746,6 +777,7 @@ public class LiveTvGuideFragment extends Fragment implements LiveTvGuide, View.O
     void detailUpdateInternal() {
         if (mSelectedProgram == null) return;
 
+        mImage.setVisibility(View.VISIBLE);
         mTitle.setText(mSelectedProgram.getName());
         mSummary.setText(mSelectedProgram.getOverview());
 

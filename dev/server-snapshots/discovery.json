@@ -1,0 +1,60 @@
+{
+  "extensions": [
+    {
+      "id": "for-you",
+      "title": "For You",
+      "version": "1.0.0",
+      "entryPoints": [
+        {
+          "id": "browse",
+          "title": "For You",
+          "screenId": "root"
+        }
+      ],
+      "homeRows": [
+        {
+          "id": "row-dG9wLXBpY2tz",
+          "title": "Popular Picks",
+          "screenId": "row-dG9wLXBpY2tz"
+        },
+        {
+          "id": "row-cmVjb21tZW5kZWQtbW92aWVz",
+          "title": "Popular Movies",
+          "screenId": "row-cmVjb21tZW5kZWQtbW92aWVz"
+        },
+        {
+          "id": "row-bmV3LWZvci15b3U",
+          "title": "New Arrivals",
+          "screenId": "row-bmV3LWZvci15b3U"
+        }
+      ]
+    },
+    {
+      "id": "live-tv",
+      "title": "Live-TV Control Center",
+      "version": "1.0.0",
+      "entryPoints": [
+        {
+          "id": "categories",
+          "title": "Live TV categories",
+          "screenId": "root"
+        }
+      ],
+      "homeRows": []
+    },
+    {
+      "id": "library-sampler",
+      "title": "Library sampler",
+      "version": "1.0.0",
+      "entryPoints": [
+        {
+          "id": "recent",
+          "title": "Library sampler",
+          "screenId": "root"
+        }
+      ],
+      "homeRows": []
+    }
+  ],
+  "protocolVersion": 1
+}

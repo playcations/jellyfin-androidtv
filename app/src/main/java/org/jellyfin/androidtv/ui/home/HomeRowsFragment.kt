@@ -4,6 +4,9 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
 import androidx.leanback.app.RowsSupportFragment
+import androidx.leanback.widget.ArrayObjectAdapter
+import androidx.leanback.widget.HeaderItem
+import org.jellyfin.androidtv.extensions.*
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.OnItemViewClickedListener
 import androidx.leanback.widget.OnItemViewSelectedListener
@@ -75,6 +78,46 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private val navigationRepository by inject<NavigationRepository>()
 	private val itemLauncher by inject<ItemLauncher>()
 	private val keyProcessor by inject<KeyProcessor>()
+
+	private val extensions by lazy { ExtensionRepository(api, userRepository) }
+	private val extensionRows = mutableListOf<Row>()
+	private var extensionSession: ExtensionSession? = null
+	private var extensionDiscovery: List<ClientExtension> = emptyList()
+	private var extensionLoad: kotlinx.coroutines.Job? = null
+	private var extensionAction: kotlinx.coroutines.Job? = null
+
+	private fun refreshExtensions() {
+		extensionLoad?.cancel()
+		val rows = adapter as MutableObjectAdapter<Row>
+		for (row in extensionRows) rows.remove(row)
+		extensionRows.clear()
+		extensionSession = extensions.currentSession()
+		val session = extensionSession ?: return
+		extensionLoad = lifecycleScope.launch {
+			try {
+				val providers = extensions.discover(session)
+				extensionDiscovery = providers
+				if (providers.isEmpty()) return@launch
+				val catalog = ArrayObjectAdapter(ExtensionPresenterSelector()).apply { add(ExtensionCatalogCard) }
+				val catalogRow = ListRow(HeaderItem("Extensions"), catalog)
+				extensionRows.add(catalogRow)
+				rows.add(catalogRow)
+				for (provider in providers) for (link in provider.homeRows) {
+					try {
+						val page = extensions.screen(provider.id, link.screenId, session = session)
+						val cards = ArrayObjectAdapter(ExtensionPresenterSelector())
+						for (entry in page.items) cards.add(entry)
+						cards.add(ExtensionEntry("more", "View all · ${link.title}", null, ExtensionAction.OpenScreen(provider.id, link.screenId)))
+						val row = ListRow(HeaderItem(link.title), cards)
+						extensionRows.add(row)
+						rows.add(row)
+					} catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+					catch (_: Exception) { /* Isolate this unavailable provider row. */ }
+				}
+			} catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+			catch (_: Exception) { /* A missing bridge preserves the stock home. */ }
+		}
+	}
 
 	private val helper by lazy { HomeFragmentHelper(requireContext(), userRepository, userPreferences) }
 
@@ -167,6 +210,16 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 		lifecycleScope.launch {
 			lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+				launch {
+					while (isActive) {
+						delay(15.seconds)
+						val session = extensionSession ?: continue
+						try {
+							if (extensions.discover(session) != extensionDiscovery) refreshExtensions()
+						} catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+						catch (_: Exception) { refreshExtensions() }
+					}
+				}
 				api.webSocket.subscribe<UserDataChangedMessage>()
 					.onEach { refreshRows(force = true, delayed = false) }
 					.launchIn(this)
@@ -174,6 +227,12 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				api.webSocket.subscribe<LibraryChangedMessage>()
 					.onEach { refreshRows(force = true, delayed = false) }
 					.launchIn(this)
+			}
+		}
+
+		lifecycleScope.launch {
+			userRepository.currentUser.collect {
+				if (extensionSession != null && extensions.currentSession() != extensionSession) refreshExtensions()
 			}
 		}
 
@@ -188,6 +247,8 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 	override fun onResume() {
 		super.onResume()
+
+		refreshExtensions()
 
 		//React to deletion
 		if (currentRow != null && currentItem != null && currentItem?.baseItem != null && currentItem!!.baseItem!!.id == dataRefreshService.lastDeletedItemId) {
@@ -207,6 +268,14 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		// Update audio queue
 		Timber.i("Updating audio queue in HomeFragment (onResume)")
 		nowPlaying.update(requireContext(), adapter as MutableObjectAdapter<Row>)
+	}
+
+	override fun onPause() {
+		super.onPause()
+		extensionLoad?.cancel()
+		extensionAction?.cancel()
+		for (row in extensionRows) (adapter as MutableObjectAdapter<Row>).remove(row)
+		extensionRows.clear()
 	}
 
 	override fun onQueueStatusChanged(hasQueue: Boolean) {
@@ -249,6 +318,21 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			rowViewHolder: RowPresenter.ViewHolder?,
 			row: Row?,
 		) {
+			if (item is ExtensionEntry || item is ExtensionCatalogCard) {
+				val session = extensionSession ?: return
+				if (extensionAction?.isActive == true) return
+				extensionAction = lifecycleScope.launch {
+					try {
+						if (item is ExtensionEntry) ExtensionActionDispatcher(this@HomeRowsFragment).dispatch(item.action, session, item.extensionId)
+						else navigationRepository.navigate(Destinations.extensionScreen(session = session))
+					} catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+					catch (_: Exception) {
+						android.widget.Toast.makeText(requireContext(), "Extension unavailable or access changed", android.widget.Toast.LENGTH_LONG).show()
+						refreshExtensions()
+					}
+				}
+				return
+			}
 			if (item is GridButton) {
 				when (item.id) {
 					LiveTvOption.LIVE_TV_GUIDE_OPTION_ID -> navigationRepository.navigate(Destinations.liveTvGuide)

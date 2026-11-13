@@ -43,7 +43,23 @@ import timber.log.Timber;
 
 public class TvManager {
     private static List<BaseItemDto> allChannels;
-    private static UUID[] channelIds;
+    private static UUID[] channelIds = new UUID[0];
+    private static Object cacheViewer;
+    private static long cacheGeneration;
+    public static void clearCaches() {
+        allChannels = null;
+        channelIds = new UUID[0];
+        mProgramsDict.clear();
+        cacheGeneration++;
+        forceReload = true;
+    }
+    private static void ensureViewer() {
+        Object viewer = TvManagerHelperKt.currentGuideViewer();
+        if (!java.util.Objects.equals(cacheViewer, viewer)) {
+            clearCaches();
+            cacheViewer = viewer;
+        }
+    }
     private static HashMap<UUID, ArrayList<BaseItemDto>> mProgramsDict = new HashMap<>();
     private static LocalDateTime needLoadTime;
     private static boolean forceReload;
@@ -65,6 +81,7 @@ public class TvManager {
     }
 
     public static List<BaseItemDto> getAllChannels() {
+        ensureViewer();
         return allChannels == null ? Collections.emptyList() : allChannels;
     }
 
@@ -75,6 +92,7 @@ public class TvManager {
     public static boolean shouldForceReload() { return forceReload; }
 
     public static int getAllChannelsIndex(UUID id) {
+        ensureViewer();
         if (allChannels == null) return -1;
         for (int i = 0; i < allChannels.size(); i++) {
             if (allChannels.get(i).getId().equals(id)) return i;
@@ -98,11 +116,17 @@ public class TvManager {
     }
 
     public static void loadAllChannels(Fragment fragment, Function<Integer, Void> outerResponse) {
+        ensureViewer();
+        clearCaches();
+        final long generation = cacheGeneration;
         TvManagerHelperKt.loadLiveTvChannels(fragment, channels -> {
+            ensureViewer();
+            if (generation != cacheGeneration) return null;
             if (channels != null) {
                 allChannels = new ArrayList<>(channels);
                 outerResponse.apply(fillChannelIds());
             } else {
+                clearCaches();
                 outerResponse.apply(0);
             }
             return null;
@@ -114,7 +138,7 @@ public class TvManager {
         if (allChannels != null) {
             channelIds = new UUID[allChannels.size()];
             UUID last = getLastLiveTvChannel();
-            if (last == null) return ndx;
+
             int i = 0;
             for (BaseItemDto channel : allChannels) {
                 channelIds[i++] = channel.getId();
@@ -129,9 +153,15 @@ public class TvManager {
         LocalDateTime startTimeRounded = startTime.withMinute(startTime.getMinute() >= 30 ? 30 : 0).withSecond(0).withNano(0);
         LocalDateTime endTimeRounded = endTime.minusSeconds(1);
 
-        endNdx = endNdx > channelIds.length ? channelIds.length : endNdx+1; //array copy range final ndx is exclusive
+        ensureViewer();
+        if (channelIds.length == 0 || startNdx < 0 || startNdx >= channelIds.length) { outerResponse.onResponse(); return; }
+        final long generation = cacheGeneration;
+        endNdx = Math.min(channelIds.length, endNdx + 1); //array copy range final ndx is exclusive
 
         TvManagerHelperKt.getPrograms(fragment, Arrays.copyOfRange(channelIds, startNdx, endNdx), startTimeRounded, endTimeRounded, programs -> {
+            ensureViewer();
+            if (generation != cacheGeneration) return null;
+            mProgramsDict.clear();
             if (programs != null) {
                 Timber.d("*** About to build dictionary");
                 buildProgramsDict(programs, startTime);
@@ -160,6 +190,7 @@ public class TvManager {
     }
 
     public static List<BaseItemDto> getProgramsForChannel(UUID channelId, GuideFilters filters) {
+        ensureViewer();
         if (!mProgramsDict.containsKey(channelId)) return new ArrayList<>();
 
         List<BaseItemDto> results = mProgramsDict.get(channelId);
@@ -175,6 +206,7 @@ public class TvManager {
     }
 
     public static List<BaseItemDto> getProgramsForChannel(UUID channelId) {
+        ensureViewer();
         return !mProgramsDict.containsKey(channelId) ? new ArrayList<BaseItemDto>() : mProgramsDict.get(channelId);
     }
 
