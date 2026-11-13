@@ -1,5 +1,7 @@
 package org.jellyfin.androidtv.extensions
 
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import org.jellyfin.sdk.model.api.BaseItemDto
 import java.util.UUID
 
@@ -13,25 +15,32 @@ class ExtensionActionExecutor(
 	private val openGuide: (String, String, ExtensionSession) -> Unit,
 ) {
 	suspend fun dispatch(action: ExtensionAction, expected: ExtensionSession, provider: String? = null) {
-		require(repository.currentSession() == expected) { "Viewer changed" }
-		if (provider != null) require(repository.discover(expected).any { it.id == provider }) { "Extension removed or access revoked" }
+		suspend fun validate() {
+			currentCoroutineContext().ensureActive()
+			require(repository.currentSession() == expected) { "Viewer changed" }
+			if (provider != null) require(repository.discover(expected).any { it.id == provider }) { "Extension removed or access revoked" }
+			currentCoroutineContext().ensureActive()
+		}
+		validate()
 		when (action) {
 			is ExtensionAction.OpenScreen -> {
 				repository.screen(action.extensionId, action.screenId, session = expected)
+				validate()
 				openScreen(action.extensionId, action.screenId, expected)
 			}
 			is ExtensionAction.OpenItem -> {
 				fetchItem(action.itemId)
-				require(repository.currentSession() == expected)
+				validate()
 				openItem(action.itemId)
 			}
 			is ExtensionAction.PlayItem -> {
 				val item = fetchItem(action.itemId)
-				require(repository.currentSession() == expected)
+				validate()
 				playItem(item)
 			}
 			is ExtensionAction.OpenGuide -> {
 				repository.guide(action.extensionId, action.scopeId, expected)
+				validate()
 				openGuide(action.extensionId, action.scopeId, expected)
 			}
 		}

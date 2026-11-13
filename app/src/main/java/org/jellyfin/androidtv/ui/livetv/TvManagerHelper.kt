@@ -25,6 +25,15 @@ import org.koin.android.ext.android.inject
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.UUID
+import java.util.Locale
+
+/** Exact-ID requests cannot use the channel-list endpoint's sort options. Preserve those preferences locally. */
+internal fun sortScopedGuideChannels(channels: Collection<BaseItemDto>, datePlayed: Boolean, favoritesFirst: Boolean): List<BaseItemDto> {
+	val order = if (datePlayed) compareByDescending<BaseItemDto> { it.userData?.lastPlayedDate ?: LocalDateTime.MIN }
+		else compareBy { (it.sortName ?: it.name.orEmpty()).lowercase(Locale.ROOT) }
+	val comparator = if (favoritesFirst) compareByDescending<BaseItemDto> { it.userData?.isFavorite == true }.then(order) else order
+	return channels.sortedWith(comparator)
+}
 
 fun BaseItemDto.copyWithLastPlayedDate(
 	lastPlayedDate: LocalDateTime,
@@ -37,6 +46,8 @@ fun BaseItemDto.copyWithLastPlayedDate(
 fun loadLiveTvChannels(fragment: Fragment, callback: (channels: Collection<BaseItemDto>?) -> Unit) {
 	val liveTvPreferences by fragment.inject<LiveTvPreferences>()
 	val api by fragment.inject<ApiClient>()
+	val guideSession = (fragment as? LiveTvGuideFragment)?.guideSession
+	val generation = guideSession?.generation
 
 	fragment.lifecycleScope.launch {
 		val users by fragment.inject<UserRepository>()
@@ -46,6 +57,8 @@ fun loadLiveTvChannels(fragment: Fragment, callback: (channels: Collection<BaseI
 		runCatching {
 			requireNotNull(viewer)
 			val scope = resolveGuideScope(fragment, repository, viewer)
+			if (scope != null && guideSession != null
+				&& !guideSession.authorize(requireNotNull(generation), scope.channelIds)) return@launch
 			val channels = withContext(Dispatchers.IO) {
 				if (scope == null) api.liveTvApi.getLiveTvChannels(
 					addCurrentProgram = true,
@@ -60,8 +73,8 @@ fun loadLiveTvChannels(fragment: Fragment, callback: (channels: Collection<BaseI
 				}
 			}
 			require(repository.currentSession() == viewer)
-			(fragment as? LiveTvGuideFragment)?.guideSession?.authorizedIds = scope?.channelIds
-			channels
+			if (guideSession != null && guideSession.generation != generation) return@launch
+			if (scope == null) channels else sortScopedGuideChannels(channels, sortDatePlayed, liveTvPreferences[LiveTvPreferences.favsAtTop])
 		}.fold(onSuccess = { callback(it) }, onFailure = { callback(null) })
 	}
 }

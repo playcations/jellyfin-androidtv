@@ -92,7 +92,7 @@ public class LiveTvGuideFragment extends Fragment implements LiveTvGuide, View.O
     public void extensionUnavailable() {
         if (mDisplayProgramsTask != null) mDisplayProgramsTask.cancel(true);
         if (mDetailPopup != null) mDetailPopup.dismiss();
-        guideSession.clear();
+        guideSession.invalidate();
         mSummary.setText("");
         mImage.setVisibility(View.INVISIBLE);
         mInfoRow.removeAllViews();

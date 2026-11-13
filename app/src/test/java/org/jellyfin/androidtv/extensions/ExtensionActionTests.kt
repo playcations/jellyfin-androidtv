@@ -67,4 +67,17 @@ class ExtensionActionTests : FunSpec({
 		shouldThrowAny { executor.dispatch(ExtensionAction.OpenScreen("provider", "nested"), original, "provider") }
 		stack shouldBe listOf("category")
 	}
+	test("provider revoked during a delayed media fetch cannot open details or launch playback") {
+		val delayed = ExtensionActionExecutor(repo,
+			fetchItem = { revoked = true; BaseItemDto(id = it, type = BaseItemKind.MOVIE) },
+			openScreen = { _, _, _ -> error("Unexpected screen") },
+			openItem = { stack.add("item:$it") }, playItem = { stack.add("play:${it.id}") },
+			openGuide = { _, _, _ -> error("Unexpected guide") },
+		)
+		for (action in listOf(ExtensionAction.OpenItem(itemId), ExtensionAction.PlayItem(itemId))) {
+			revoked = false
+			shouldThrowAny { delayed.dispatch(action, original, "provider") }
+			stack shouldBe listOf("category")
+		}
+	}
 })

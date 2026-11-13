@@ -51,13 +51,13 @@ class ExtensionPresenterSelector : PresenterSelector() {
 object ExtensionCatalogCard
 private data class MorePage(val start: Int) { override fun toString() = "Load more" }
 
-class ExtensionActionDispatcher(private val fragment: androidx.fragment.app.Fragment) {
+class ExtensionActionDispatcher(private val fragment: androidx.fragment.app.Fragment, private val validSource: () -> Boolean = { true }) {
 	private val api by fragment.inject<ApiClient>()
 	private val users by fragment.inject<UserRepository>()
 	private val navigation by fragment.inject<NavigationRepository>()
 	private val playback by fragment.inject<PlaybackLauncher>()
 	private val repository get() = ExtensionRepository(api, users)
-	private fun requireActive() { check(fragment.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) { "Source screen closed" } }
+	private fun requireActive() { check(validSource() && fragment.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) { "Source screen closed" } }
 	suspend fun dispatch(action: ExtensionAction, expected: ExtensionSession, provider: String? = null) {
 		ExtensionActionExecutor(
 			repository,
@@ -96,6 +96,7 @@ class ExtensionScreenFragment : VerticalGridSupportFragment() {
 	private var refresh: kotlinx.coroutines.Job? = null
 	private var viewerObserver: kotlinx.coroutines.Job? = null
 	private var actionJob: kotlinx.coroutines.Job? = null
+	private val work = ExtensionWorkState()
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -106,24 +107,32 @@ class ExtensionScreenFragment : VerticalGridSupportFragment() {
 		adapter = objects
 		setOnItemViewSelectedListener { _, item, _, _ -> if (item != null) selected = objects.indexOf(item).coerceAtLeast(0) }
 		setOnItemViewClickedListener { _, item, _, _ ->
-			if (!busy) actionJob = lifecycleScope.launch {
+			val generation = work.current()
+			if (!busy && work.accepts(generation)) actionJob = lifecycleScope.launch {
+				work.requireCurrent(generation)
 				busy = true
 				try {
 					when (item) {
-						is MorePage -> loadPage(item.start)
-						is ExtensionEntry -> ExtensionActionDispatcher(this@ExtensionScreenFragment).dispatch(item.action, requireNotNull(session), item.extensionId)
+						is MorePage -> loadPage(item.start, generation)
+						is ExtensionEntry -> ExtensionActionDispatcher(this@ExtensionScreenFragment) { work.accepts(generation) }.dispatch(item.action, requireNotNull(session), item.extensionId)
 					}
-				} catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (_: Exception) { unavailable() } finally { busy = false }
+				} catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (_: Exception) { unavailable() } finally { if (work.accepts(generation)) busy = false }
 			}
 		}
 	}
 	private fun unavailable() {
+		work.invalidate()
+		actionJob?.cancel()
+		refresh?.cancel()
+		viewerObserver?.cancel()
+		busy = false
 		objects.clear()
 		title = "Extension unavailable"
 		if (isAdded) Toast.makeText(requireContext(), "Extension unavailable or access changed. Press Back to return.", Toast.LENGTH_LONG).show()
 	}
 	override fun onResume() {
 		super.onResume()
+		val generation = work.resume()
 		refresh?.cancel()
 		refresh = lifecycleScope.launch {
 			busy = true
@@ -133,17 +142,20 @@ class ExtensionScreenFragment : VerticalGridSupportFragment() {
 			try {
 				session = requireNotNull(repo.currentSession()).also { require(matchesExtensionViewer(requireArguments(), it)) }
 				if (arguments?.getString(ARG_EXTENSION) == null) {
-					for (extension in repo.discover(requireNotNull(session))) for (link in extension.entryPoints) {
+					val extensions = repo.discover(requireNotNull(session))
+					work.requireCurrent(generation)
+					for (extension in extensions) for (link in extension.entryPoints) {
 						objects.add(ExtensionEntry("${extension.id}:${link.id}", "${extension.title} · ${link.title}", null, ExtensionAction.OpenScreen(extension.id, link.screenId)))
 					}
 					if (objects.size() == 0) title = "No extensions available"
 				} else {
 					loadedPages = 0
 					var start: Int? = 0
-					repeat(pages) { if (start != null) start = loadPage(requireNotNull(start)) }
+					repeat(pages) { if (start != null) start = loadPage(requireNotNull(start), generation) }
 				}
+				work.requireCurrent(generation)
 				setSelectedPosition(restore.coerceIn(0, (objects.size() - 1).coerceAtLeast(0)))
-			} catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (_: Exception) { unavailable() } finally { busy = false }
+			} catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (_: Exception) { unavailable() } finally { if (work.accepts(generation)) busy = false }
 		}
 		// Logout/user switch blanks the currently displayed provider immediately.
 		viewerObserver?.cancel()
@@ -161,8 +173,9 @@ class ExtensionScreenFragment : VerticalGridSupportFragment() {
 			}
 		}
 	}
-	private suspend fun loadPage(start: Int): Int? {
+	private suspend fun loadPage(start: Int, generation: Long): Int? {
 		val page = repo.screen(requireArguments().getString(ARG_EXTENSION)!!, requireArguments().getString(ARG_SCREEN)!!, start, session = requireNotNull(session))
+		work.requireCurrent(generation)
 		title = page.title
 		nativeGrid.columns(if (page.view == "categories") 1 else 4)
 		if (objects.size() > 0 && objects.get(objects.size() - 1) is MorePage) objects.removeItems(objects.size() - 1, 1)
@@ -171,7 +184,7 @@ class ExtensionScreenFragment : VerticalGridSupportFragment() {
 		loadedPages++
 		return page.nextIndex
 	}
-	override fun onPause() { super.onPause(); actionJob?.cancel(); refresh?.cancel(); viewerObserver?.cancel(); objects.clear() }
+	override fun onPause() { super.onPause(); work.invalidate(); actionJob?.cancel(); refresh?.cancel(); viewerObserver?.cancel(); objects.clear(); busy = false }
 	override fun onSaveInstanceState(outState: Bundle) {
 		outState.putInt("selection", selected)
 		outState.putInt("pages", loadedPages)

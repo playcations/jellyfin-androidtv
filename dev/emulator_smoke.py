@@ -15,13 +15,17 @@ args = parser.parse_args()
 SERIAL, PORT = args.serial, args.adb_port
 assert SERIAL.startswith('emulator-')
 ARTIFACTS = Path(args.artifacts)
-ARTIFACTS.mkdir(exist_ok=True)
+ARTIFACTS.mkdir(parents=True, exist_ok=True)
 checks = []
+(ARTIFACTS / 'checks.json').write_text('[]\n')
 def adb(*args, timeout=90, binary=False):
     return subprocess.check_output([ADB, '-P', PORT, '-s', SERIAL, *args], timeout=timeout, text=not binary)
 def key(name):
     adb('shell', 'input', 'keyevent', name)
 def snapshot(name):
+    # uiautomator can exit successfully with "null root" and leave an older dump behind.
+    # Never let a previous screen/run satisfy the current assertion.
+    adb('shell', 'rm', '-f', '/sdcard/familyfin-native-ui.xml')
     adb('shell', 'uiautomator', 'dump', '/sdcard/familyfin-native-ui.xml')
     data = adb('shell', 'cat', '/sdcard/familyfin-native-ui.xml')
     (ARTIFACTS / (name + '.xml')).write_text(data)
@@ -31,7 +35,8 @@ def strings(root):
     return ' | '.join(n.get('text', '') for n in root.iter()).lower()
 def expect(name, text):
     last = None
-    for attempt in range(4):
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
         try:
             last = snapshot(name)
             if text.lower() in strings(last):

@@ -155,12 +155,13 @@ fun LiveTvGuideFragment.observeExtensionViewer() {
 				users.currentUser.collect { if (repository.currentSession() != initial) extensionUnavailable() }
 			}
 			if (arguments?.containsKey(org.jellyfin.androidtv.extensions.ExtensionScreenFragment.ARG_SCOPE) == true) launch {
-				while (true) {
+				while (!guideSession.isUnavailable) {
 					kotlinx.coroutines.delay(15000)
 					runCatching {
+						val generation = guideSession.generation
 						require(repository.currentSession() == initial)
 						val scope = repository.guide(requireArguments().getString(org.jellyfin.androidtv.extensions.ExtensionScreenFragment.ARG_EXTENSION)!!, requireArguments().getString(org.jellyfin.androidtv.extensions.ExtensionScreenFragment.ARG_SCOPE)!!)
-						require(scope.channelIds == guideSession.authorizedIds)
+						guideSession.authorize(generation, scope.channelIds)
 					}.onFailure { extensionUnavailable() }
 				}
 			}

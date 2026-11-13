@@ -10,16 +10,21 @@ import java.util.function.Function
 /** Owned by a single fragment; callbacks from previous refreshes cannot repopulate its state. */
 class NativeGuideSession {
 	private val state = GuideState()
-	var authorizedIds: Set<UUID>? = null
-	fun clear() { state.clear(); authorizedIds = null }
+	val authorizedIds get() = state.authorizedIds
+	val generation get() = state.generation
+	val isUnavailable get() = state.unavailable
+	fun authorize(generation: Long, ids: Set<UUID>) = state.authorize(generation, ids)
+	fun clear() { state.reload() }
+	fun invalidate() { state.invalidate() }
 	fun getAllChannels() = state.channels
 	fun getChannel(index: Int) = state.channels.getOrNull(index)
 	fun getChannel(id: UUID) = state.channels.firstOrNull { it.id == id }
 	fun loadAllChannels(fragment: LiveTvGuideFragment, callback: Function<Int, Void?>) {
-		val generation = state.clear()
+		if (state.unavailable) { fragment.extensionUnavailable(); return }
+		val generation = state.reload()
 		loadLiveTvChannels(fragment) { channels ->
 			if (state.generation != generation) return@loadLiveTvChannels
-			if (channels == null) fragment.extensionUnavailable()
+			if (channels == null) { fragment.extensionUnavailable(); return@loadLiveTvChannels }
 			state.channels(generation, channels.orEmpty())
 			callback.apply(state.channels.indexOfFirst { it.id == TvManager.getLastLiveTvChannel() }.coerceAtLeast(0))
 		}

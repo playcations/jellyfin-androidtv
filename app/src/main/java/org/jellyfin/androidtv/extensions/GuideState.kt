@@ -10,10 +10,25 @@ class GuideState {
 	private var programs: Map<UUID, List<BaseItemDto>> = emptyMap()
 	var generation: Long = 0
 		private set
-	fun clear(): Long {
+	var authorizedIds: Set<UUID>? = null
+		private set
+	var unavailable: Boolean = false
+		private set
+	fun invalidate() { unavailable = true; clear() }
+	fun clear(): Long = reset(true)
+	fun reload(): Long = reset(false)
+	private fun reset(resetScope: Boolean): Long {
 		channels = emptyList()
 		programs = emptyMap()
+		if (resetScope) authorizedIds = null
 		return ++generation
+	}
+	/** Establish before channel I/O; subsequent reloads/validators may only confirm the same scope. */
+	fun authorize(generation: Long, ids: Set<UUID>): Boolean {
+		if (unavailable || generation != this.generation) return false
+		require(ids.isNotEmpty() && (authorizedIds == null || authorizedIds == ids)) { "Guide permissions changed" }
+		authorizedIds = ids.toSet()
+		return true
 	}
 	fun channels(generation: Long, value: Collection<BaseItemDto>) { if (generation == this.generation) channels = value.toList() }
 	fun programs(generation: Long, value: Collection<BaseItemDto>) {

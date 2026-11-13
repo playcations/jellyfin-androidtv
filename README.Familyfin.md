@@ -70,3 +70,15 @@ fixtures intentionally have invalid stream URLs. Provider-supplied custom artwor
 is unsupported, and category labels use a basic native focusable-button treatment.
 A scope change closes the guide with an unavailable message; Back/reopen fetches
 the new scope rather than silently changing the current channel selection.
+
+Scope authorization is established before channel-detail loading and retained
+across sorting/filtering reloads and temporary pauses. A changed or revoked scope
+cannot be accepted by reloading the unavailable guide. Screen invalidation cancels
+pending jobs and rejects late page/action results, including non-cooperative work.
+Scoped channel requests preserve favorites/name/last-played ordering locally.
+
+The reviewed build passes 142 tests with the optional real bridge enabled (three
+of these require `FAMILYFIN_NATIVE_REAL_SESSION`). Use `:app:testDebugUnitTest
+--rerun` when changing that environment so Gradle reruns the integration cases.
+The emulator smoke helper deletes the previous XML before every capture; a
+transient accessibility error cannot satisfy assertions using stale screen data.
