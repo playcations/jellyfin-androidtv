@@ -6,8 +6,14 @@ import kotlinx.coroutines.CancellationException
 class ExtensionWorkState {
 	private var generation = 0L
 	private var available = false
-	fun resume(): Long { available = true; return ++generation }
-	fun invalidate() { available = false; generation++ }
+	fun resume(): Long {
+		available = true
+		return ++generation
+	}
+	fun invalidate() {
+		available = false
+		generation++
+	}
 	fun current() = generation
 	fun accepts(generation: Long) = available && generation == this.generation
 	fun requireCurrent(generation: Long) {

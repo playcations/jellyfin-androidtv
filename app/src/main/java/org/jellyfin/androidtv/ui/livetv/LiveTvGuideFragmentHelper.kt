@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
+import org.jellyfin.androidtv.extensions.EXTENSION_REVALIDATION_INTERVAL_MS
+import org.jellyfin.androidtv.extensions.ExtensionScreenFragment
 import org.jellyfin.androidtv.data.model.DataRefreshService
 import org.jellyfin.androidtv.data.repository.ItemMutationRepository
 import org.jellyfin.androidtv.databinding.LiveTvGuideBinding
@@ -156,11 +158,14 @@ fun LiveTvGuideFragment.observeExtensionViewer() {
 			}
 			if (arguments?.containsKey(org.jellyfin.androidtv.extensions.ExtensionScreenFragment.ARG_SCOPE) == true) launch {
 				while (!guideSession.isUnavailable) {
-					kotlinx.coroutines.delay(15000)
+					kotlinx.coroutines.delay(EXTENSION_REVALIDATION_INTERVAL_MS)
 					runCatching {
 						val generation = guideSession.generation
 						require(repository.currentSession() == initial)
-						val scope = repository.guide(requireArguments().getString(org.jellyfin.androidtv.extensions.ExtensionScreenFragment.ARG_EXTENSION)!!, requireArguments().getString(org.jellyfin.androidtv.extensions.ExtensionScreenFragment.ARG_SCOPE)!!)
+						val scope = repository.guide(
+							requireArguments().getString(ExtensionScreenFragment.ARG_EXTENSION)!!,
+							requireArguments().getString(ExtensionScreenFragment.ARG_SCOPE)!!,
+						)
 						guideSession.authorize(generation, scope.channelIds)
 					}.onFailure { extensionUnavailable() }
 				}

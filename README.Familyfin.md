@@ -82,3 +82,5 @@ of these require `FAMILYFIN_NATIVE_REAL_SESSION`). Use `:app:testDebugUnitTest
 --rerun` when changing that environment so Gradle reruns the integration cases.
 The emulator smoke helper deletes the previous XML before every capture; a
 transient accessibility error cannot satisfy assertions using stale screen data.
+
+The prototype extension host currently uses English UI copy. Its messages live in named resources; locale translations are a separate requirement before publishing the extension UI.

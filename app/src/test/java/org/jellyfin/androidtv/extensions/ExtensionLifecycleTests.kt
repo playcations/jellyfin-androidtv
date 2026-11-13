@@ -1,7 +1,7 @@
 package org.jellyfin.androidtv.extensions
 
-import io.kotest.core.spec.style.FunSpec
 import io.kotest.assertions.throwables.shouldThrowAny
+import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart

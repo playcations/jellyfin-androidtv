@@ -15,7 +15,12 @@ class TvManagerTests : FunSpec({
 				}
 				single<org.jellyfin.androidtv.auth.repository.UserRepository> {
 					io.mockk.mockk {
-						io.mockk.every { currentUser } returns kotlinx.coroutines.flow.MutableStateFlow(org.jellyfin.sdk.model.api.UserDto(id = UUID.randomUUID(), hasPassword = false, hasConfiguredPassword = false, hasConfiguredEasyPassword = false))
+						io.mockk.every { currentUser } returns kotlinx.coroutines.flow.MutableStateFlow(
+                    org.jellyfin.sdk.model.api.UserDto(
+                        id = UUID.randomUUID(), hasPassword = false,
+                        hasConfiguredPassword = false, hasConfiguredEasyPassword = false,
+                    )
+                )
 					}
 				}
 			})
@@ -48,8 +53,12 @@ class TvManagerTests : FunSpec({
 	}
 
 	test("legacy playback cache is erased on server viewer or token changes") {
-		val api = org.koin.java.KoinJavaComponent.get<org.jellyfin.sdk.api.client.ApiClient>(org.jellyfin.sdk.api.client.ApiClient::class.java)
-		val users = org.koin.java.KoinJavaComponent.get<org.jellyfin.androidtv.auth.repository.UserRepository>(org.jellyfin.androidtv.auth.repository.UserRepository::class.java)
+		val api = org.koin.java.KoinJavaComponent.get<org.jellyfin.sdk.api.client.ApiClient>(
+                    org.jellyfin.sdk.api.client.ApiClient::class.java
+                )
+		val users = org.koin.java.KoinJavaComponent.get<org.jellyfin.androidtv.auth.repository.UserRepository>(
+                    org.jellyfin.androidtv.auth.repository.UserRepository::class.java
+                )
 		val oldUser = users.currentUser.value
 		val channel = BaseItemDto(id = UUID.randomUUID(), type = BaseItemKind.TV_CHANNEL)
 		channelsField.set(null, listOf(channel))

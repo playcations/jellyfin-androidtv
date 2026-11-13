@@ -14,7 +14,10 @@ class GuideState {
 		private set
 	var unavailable: Boolean = false
 		private set
-	fun invalidate() { unavailable = true; clear() }
+	fun invalidate() {
+		unavailable = true;
+		clear()
+	}
 	fun clear(): Long = reset(true)
 	fun reload(): Long = reset(false)
 	private fun reset(resetScope: Boolean): Long {
@@ -23,6 +26,7 @@ class GuideState {
 		if (resetScope) authorizedIds = null
 		return ++generation
 	}
+
 	/** Establish before channel I/O; subsequent reloads/validators may only confirm the same scope. */
 	fun authorize(generation: Long, ids: Set<UUID>): Boolean {
 		if (unavailable || generation != this.generation) return false
@@ -30,7 +34,10 @@ class GuideState {
 		authorizedIds = ids.toSet()
 		return true
 	}
-	fun channels(generation: Long, value: Collection<BaseItemDto>) { if (generation == this.generation) channels = value.toList() }
+	fun channels(
+		generation: Long,
+		value: Collection<BaseItemDto>
+	) { if (generation == this.generation) channels = value.toList() }
 	fun programs(generation: Long, value: Collection<BaseItemDto>) {
 		if (generation != this.generation) return
 		val allowed = channels.map { it.id }.toSet()

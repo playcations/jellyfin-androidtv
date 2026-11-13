@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The Familyfin prototype's extension UI is English-only. Keep this copy in named resources
+         so locale translations can be added together when the extension UI ships. -->
+    <string translatable="false" name="extensions_title">Extensions</string>
+    <string translatable="false" name="extensions_empty">No extensions available</string>
+    <string translatable="false" name="extension_unavailable_title">Extension unavailable</string>
+    <string translatable="false" name="extension_unavailable_message">Extension unavailable or access changed. Press Back to return.</string>
+    <string translatable="false" name="extension_guide_unavailable">Guide unavailable or access changed</string>
+</resources>

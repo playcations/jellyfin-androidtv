@@ -18,7 +18,11 @@ class ExtensionActionExecutor(
 		suspend fun validate() {
 			currentCoroutineContext().ensureActive()
 			require(repository.currentSession() == expected) { "Viewer changed" }
-			if (provider != null) require(repository.discover(expected).any { it.id == provider }) { "Extension removed or access revoked" }
+			if (provider != null) {
+				require(repository.discover(expected).any {
+					it.id == provider
+				}) { "Extension removed or access revoked" }
+			}
 			currentCoroutineContext().ensureActive()
 		}
 		validate()

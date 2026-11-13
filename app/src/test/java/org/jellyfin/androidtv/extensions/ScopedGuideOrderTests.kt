@@ -12,8 +12,13 @@ import java.util.UUID
 
 class ScopedGuideOrderTests : FunSpec({
 	fun channel(name: String, favorite: Boolean, played: LocalDateTime?) = BaseItemDto(
-		id = UUID.randomUUID(), type = BaseItemKind.TV_CHANNEL, name = name,
-		userData = Json.decodeFromString<UserItemDataDto>("""{"PlayCount":0,"PlaybackPositionTicks":0,"IsFavorite":$favorite,"Played":false,"Key":"fixture","ItemId":"00000000-0000-0000-0000-000000000001"}""").copy(lastPlayedDate = played),
+		id = UUID.randomUUID(),
+		type = BaseItemKind.TV_CHANNEL,
+		name = name,
+		userData = Json.decodeFromString<UserItemDataDto>(
+			"""{"PlayCount":0,"PlaybackPositionTicks":0,"IsFavorite":$favorite,"Played":false,
+				"Key":"fixture","ItemId":"00000000-0000-0000-0000-000000000001"}"""
+		).copy(lastPlayedDate = played),
 	)
 	val first = channel("Alpha", false, LocalDateTime.of(2026, 1, 1, 0, 0))
 	val favorite = channel("Beta", true, null)

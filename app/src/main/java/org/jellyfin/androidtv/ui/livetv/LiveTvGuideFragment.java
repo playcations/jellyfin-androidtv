@@ -87,7 +87,8 @@ public class LiveTvGuideFragment extends Fragment implements LiveTvGuide, View.O
     RelativeLayout mSelectedProgramView;
 
     private List<BaseItemDto> mAllChannels;
-    private final NativeGuideSession guideSession = new NativeGuideSession();
+    private final NativeGuideSession guideSession = new NativeGuideSession(this);
+    @NonNull
     public NativeGuideSession getGuideSession() { return guideSession; }
     public void extensionUnavailable() {
         if (mDisplayProgramsTask != null) mDisplayProgramsTask.cancel(true);
@@ -100,7 +101,7 @@ public class LiveTvGuideFragment extends Fragment implements LiveTvGuide, View.O
         mChannels.removeAllViews();
         mProgramRows.removeAllViews();
         mSpinner.setVisibility(View.GONE);
-        mTitle.setText("Guide unavailable or access changed");
+        mTitle.setText(R.string.extension_guide_unavailable);
         mSelectedProgram = null;
     }
     private UUID mFirstFocusChannelId;
@@ -247,7 +248,7 @@ public class LiveTvGuideFragment extends Fragment implements LiveTvGuide, View.O
         mSelectedProgram = null;
         mCurrentGuideStart = LocalDateTime.now();
         fillTimeLine(mCurrentGuideStart, getGuideHours());
-        guideSession.loadAllChannels(this, ndx -> {
+        guideSession.loadAllChannels(ndx -> {
             if (ndx >= PAGE_SIZE) {
                 // last channel is not in first page so grab a set where it will be in the middle
                 ndx = ndx - (PAGE_SIZE / 2);
@@ -510,15 +511,12 @@ public class LiveTvGuideFragment extends Fragment implements LiveTvGuide, View.O
         mChannels.removeAllViews();
         mChannelStatus.setText("");
         mFilterStatus.setText("");
-        guideSession.getProgramsAsync(this, mCurrentDisplayChannelStartNdx, mCurrentDisplayChannelEndNdx, mCurrentGuideStart, mCurrentGuideEnd, new EmptyResponse(getLifecycle()) {
-            @Override
-            public void onResponse() {
-                if (!isActive()) return;
-                Timber.d("*** Programs response");
-                if (mDisplayProgramsTask != null) mDisplayProgramsTask.cancel(true);
-                mDisplayProgramsTask = new DisplayProgramsTask();
-                mDisplayProgramsTask.execute(mCurrentDisplayChannelStartNdx, mCurrentDisplayChannelEndNdx);
-            }
+        guideSession.getProgramsAsync(mCurrentDisplayChannelStartNdx, mCurrentDisplayChannelEndNdx, mCurrentGuideStart, mCurrentGuideEnd, () -> {
+            if (!getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) return;
+            Timber.d("*** Programs response");
+            if (mDisplayProgramsTask != null) mDisplayProgramsTask.cancel(true);
+            mDisplayProgramsTask = new DisplayProgramsTask();
+            mDisplayProgramsTask.execute(mCurrentDisplayChannelStartNdx, mCurrentDisplayChannelEndNdx);
         });
     }
 

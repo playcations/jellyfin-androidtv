@@ -2,12 +2,16 @@ package org.jellyfin.androidtv.extensions
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import org.jellyfin.sdk.model.serializer.toUUIDOrNull
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URLEncoder
-import org.jellyfin.sdk.model.serializer.toUUIDOrNull
 
 /** Optional real, disposable Jellyfin checks. Secrets are read privately and never logged/serialized. */
 class RealBridgeTests : FunSpec({

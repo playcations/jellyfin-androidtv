@@ -7,10 +7,18 @@ import org.jellyfin.sdk.api.client.ApiClient
 import java.net.HttpURLConnection
 import java.net.URI
 
+private const val HTTP_TIMEOUT_MS = 8000
+private const val READ_BUFFER_SIZE = 8192
+private const val MAX_RESPONSE_BYTES = 4 * 1024 * 1024
+private const val MAX_TOKEN_LENGTH = 4096
+private const val HASH_MULTIPLIER = 31
+
 /** Never serialized or logged. Token participates in equality so reauthentication invalidates in-flight work. */
 class ExtensionSession(val server: String, val user: String, val token: String) {
-	override fun equals(other: Any?) = other is ExtensionSession && server == other.server && user == other.user && token == other.token
-	override fun hashCode() = 31 * server.hashCode() + user.hashCode()
+	override fun equals(
+		other: Any?
+	) = other is ExtensionSession && server == other.server && user == other.user && token == other.token
+	override fun hashCode() = HASH_MULTIPLIER * server.hashCode() + user.hashCode()
 	override fun toString() = "ExtensionSession(redacted)"
 }
 fun interface ExtensionTransport { suspend fun get(session: ExtensionSession, path: String): String }
@@ -24,18 +32,18 @@ class ServerExtensionTransport : ExtensionTransport {
 		val c = url.toURL().openConnection() as HttpURLConnection
 		try {
 			c.instanceFollowRedirects = false
-			c.connectTimeout = 8000
-			c.readTimeout = 8000
+			c.connectTimeout = HTTP_TIMEOUT_MS
+			c.readTimeout = HTTP_TIMEOUT_MS
 			c.setRequestProperty("Authorization", extensionAuthorization(session.token))
 			c.setRequestProperty("Accept", "application/json")
-			require(c.responseCode == 200) { "Extension unavailable (HTTP ${c.responseCode})" }
+			require(c.responseCode == HttpURLConnection.HTTP_OK) { "Extension unavailable (HTTP ${c.responseCode})" }
 			val bytes = c.inputStream.use { input ->
 				val result = java.io.ByteArrayOutputStream()
-				val buffer = ByteArray(8192)
+				val buffer = ByteArray(READ_BUFFER_SIZE)
 				while (true) {
 					val n = input.read(buffer)
 					if (n == -1) break
-					require(result.size() + n <= 4 * 1024 * 1024) { "Extension response too large" }
+					require(result.size() + n <= MAX_RESPONSE_BYTES) { "Extension response too large" }
 					result.write(buffer, 0, n)
 				}
 				result.toByteArray()
@@ -46,7 +54,10 @@ class ServerExtensionTransport : ExtensionTransport {
 }
 
 /** Deliberately no discovery/page/scope cache: every operation rechecks the active viewer and provider. */
-class ExtensionRepository(val currentSession: () -> ExtensionSession?, private val transport: ExtensionTransport = ServerExtensionTransport()) {
+class ExtensionRepository(
+	val currentSession: () -> ExtensionSession?,
+	private val transport: ExtensionTransport = ServerExtensionTransport(),
+) {
 	constructor(api: ApiClient, users: UserRepository) : this({
 		val server = api.baseUrl
 		val token = api.accessToken
@@ -59,18 +70,35 @@ class ExtensionRepository(val currentSession: () -> ExtensionSession?, private v
 		require(currentSession() == session) { "Viewer changed" }
 		return body
 	}
-	suspend fun discover(session: ExtensionSession = requireNotNull(currentSession())) = ExtensionProtocol.discovery(get(session, ROOT))
+	suspend fun discover(
+		session: ExtensionSession = requireNotNull(
+			currentSession()
+		)
+	) = ExtensionProtocol.discovery(get(session, ROOT))
 	private suspend fun requireProvider(session: ExtensionSession, extension: String) {
 		ExtensionProtocol.identifier(extension)
 		require(discover(session).any { it.id == extension }) { "Extension removed or access revoked" }
 	}
-	suspend fun screen(extension: String, screen: String, start: Int = 0, limit: Int = ExtensionProtocol.PAGE_SIZE, session: ExtensionSession = requireNotNull(currentSession())): ExtensionPage {
+	suspend fun screen(
+		extension: String,
+		screen: String,
+		start: Int = 0,
+		limit: Int = ExtensionProtocol.PAGE_SIZE,
+		session: ExtensionSession = requireNotNull(currentSession()),
+	): ExtensionPage {
 		ExtensionProtocol.identifier(screen)
-		require(start >= 0 && limit in 1..100)
+		require(start >= 0 && limit in 1..ExtensionProtocol.MAX_PAGE_SIZE)
 		requireProvider(session, extension)
-		return ExtensionProtocol.page(get(session, "$ROOT/extensions/$extension/screens/$screen?startIndex=$start&limit=$limit"), extension, screen, start, limit)
+		val body = get(session, "$ROOT/extensions/$extension/screens/$screen?startIndex=$start&limit=$limit")
+		return ExtensionProtocol.page(body, extension, screen, start, limit)
 	}
-	suspend fun guide(extension: String, scope: String, session: ExtensionSession = requireNotNull(currentSession())): ExtensionGuideScope {
+	suspend fun guide(
+		extension: String,
+		scope: String,
+		session: ExtensionSession = requireNotNull(
+			currentSession()
+		)
+	): ExtensionGuideScope {
 		ExtensionProtocol.identifier(scope)
 		requireProvider(session, extension)
 		return ExtensionProtocol.scope(get(session, "$ROOT/extensions/$extension/guide-scopes/$scope"), scope)
@@ -80,6 +108,11 @@ class ExtensionRepository(val currentSession: () -> ExtensionSession?, private v
 
 /** Jellyfin 12 uses the standard MediaBrowser header; legacy token-only headers may be disabled. */
 internal fun extensionAuthorization(token: String): String {
-	require(token.isNotEmpty() && token.length <= 4096 && token.none { it == '\r' || it == '\n' || it == '\"' || it == '\\' })
-	return "MediaBrowser Client=\"Familyfin Native\", Device=\"Android TV\", DeviceId=\"familyfin-native-extensions\", Version=\"0.1.0\", Token=\"$token\""
+	require(
+		token.isNotEmpty() && token.length <= MAX_TOKEN_LENGTH && token.none {
+			it == '\r' || it == '\n' || it == '\"' || it == '\\'
+		}
+	)
+	return "MediaBrowser Client=\"Familyfin Native\", Device=\"Android TV\", " +
+		"DeviceId=\"familyfin-native-extensions\", Version=\"0.1.0\", Token=\"$token\""
 }

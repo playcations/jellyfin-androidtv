@@ -6,7 +6,11 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import org.jellyfin.androidtv.auth.repository.UserRepository
-import org.jellyfin.androidtv.extensions.*
+import org.jellyfin.androidtv.extensions.ExtensionGuideScope
+import org.jellyfin.androidtv.extensions.ExtensionRepository
+import org.jellyfin.androidtv.extensions.ExtensionScreenFragment
+import org.jellyfin.androidtv.extensions.ExtensionSession
+import org.jellyfin.androidtv.extensions.matchesExtensionViewer
 import org.jellyfin.sdk.api.client.extensions.get
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -26,6 +30,8 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.UUID
 import java.util.Locale
+
+private const val CHANNEL_DETAIL_CONCURRENCY = 8
 
 /** Exact-ID requests cannot use the channel-list endpoint's sort options. Preserve those preferences locally. */
 internal fun sortScopedGuideChannels(channels: Collection<BaseItemDto>, datePlayed: Boolean, favoritesFirst: Boolean): List<BaseItemDto> {
@@ -67,27 +73,39 @@ fun loadLiveTvChannels(fragment: Fragment, callback: (channels: Collection<BaseI
 					sortOrder = if (sortDatePlayed) SortOrder.DESCENDING else SortOrder.ASCENDING,
 				).content.items else coroutineScope {
 					// The standard channels list endpoint has no ID filter. Fetch only the explicitly authorized IDs.
-					scope.channelIds.toList().chunked(8).flatMap { chunk -> chunk.map { id -> async {
+					scope.channelIds.toList().chunked(CHANNEL_DETAIL_CONCURRENCY).flatMap { chunk -> chunk.map { id -> async {
 						api.get<BaseItemDto>(pathTemplate = "/LiveTv/Channels/$id").content.also { require(it.id == id) }
 					} }.awaitAll() }
 				}
 			}
 			require(repository.currentSession() == viewer)
 			if (guideSession != null && guideSession.generation != generation) return@launch
-			if (scope == null) channels else sortScopedGuideChannels(channels, sortDatePlayed, liveTvPreferences[LiveTvPreferences.favsAtTop])
+			if (scope == null) channels else sortScopedGuideChannels(
+				channels, sortDatePlayed, liveTvPreferences[LiveTvPreferences.favsAtTop],
+			)
 		}.fold(onSuccess = { callback(it) }, onFailure = { callback(null) })
 	}
 }
 
 /** Every channel and program request rechecks the viewer and bridge scope, including pagination/refresh. */
-private suspend fun resolveGuideScope(fragment: Fragment, repository: ExtensionRepository, session: ExtensionSession): ExtensionGuideScope? {
+private suspend fun resolveGuideScope(
+	fragment: Fragment,
+	repository: ExtensionRepository,
+	session: ExtensionSession,
+): ExtensionGuideScope? {
 	val args = fragment.arguments ?: return null
 	if (!args.containsKey(ExtensionScreenFragment.ARG_SCOPE)) {
-		require(!args.containsKey(ExtensionScreenFragment.ARG_EXTENSION) && !args.containsKey(ExtensionScreenFragment.ARG_USER)) { "Incomplete guide scope" }
+		require(!args.containsKey(ExtensionScreenFragment.ARG_EXTENSION) && !args.containsKey(ExtensionScreenFragment.ARG_USER)) {
+			"Incomplete guide scope"
+		}
 		return null
 	}
 	require(matchesExtensionViewer(args, session)) { "Guide viewer changed" }
-	return repository.guide(requireNotNull(args.getString(ExtensionScreenFragment.ARG_EXTENSION)), requireNotNull(args.getString(ExtensionScreenFragment.ARG_SCOPE)), session)
+	return repository.guide(
+		requireNotNull(args.getString(ExtensionScreenFragment.ARG_EXTENSION)),
+		requireNotNull(args.getString(ExtensionScreenFragment.ARG_SCOPE)),
+		session,
+	)
 }
 
 fun getPrograms(
